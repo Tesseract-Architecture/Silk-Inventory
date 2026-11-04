@@ -119,3 +119,15 @@ describe('carga de equipo', () => {
     expect(nameFromEmail('anahi.centurion@silk-technologies.com')).toBe('Anahi Centurion');
   });
 });
+
+describe('cleanSerial', () => {
+  it('saca la S que agrega el lector solo en series Cisco', async () => {
+    const { cleanSerial } = await import('../src/lib/serial.js');
+    expect(cleanSerial('SFCH2627Y066')).toBe('FCH2627Y066');
+    expect(cleanSerial(' ssdg2510eu65 ')).toBe('SDG2510EU65');
+    expect(cleanSerial('FCH2627Y07L')).toBe('FCH2627Y07L'); // ya estaba bien
+    expect(cleanSerial('SPC171406H7')).toBe('SPC171406H7'); // 11 caracteres: es la serie real
+    expect(cleanSerial('Q2GW-CRDT-E34H')).toBe('Q2GW-CRDT-E34H'); // Meraki
+    expect(cleanSerial('')).toBeNull();
+  });
+});

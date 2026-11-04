@@ -1,6 +1,7 @@
 // Lectura del Excel viejo: detecta encabezados por nombre y arma filas normalizadas.
 // No toca la base de datos (se testea aparte).
 import ExcelJS from 'exceljs';
+import { cleanSerial } from '../lib/serial.js';
 
 export type Field =
   | 'id' | 'location' | 'shelf' | 'category' | 'description' | 'serial'
@@ -158,7 +159,7 @@ export async function parseWorkbook(file: string | Buffer, skipSheets: RegExp | 
         shelf: shelf || null,
         category: v.category || null,
         description: description || '(sin descripción)',
-        serial: serial || null,
+        serial: cleanSerial(serial),
         notes: v.notes || null,
         quantity: toNumber(v.quantity ?? ''),
         brand: v.brand || null,
@@ -242,7 +243,7 @@ function parseColumnLayout(ws: ExcelJS.Worksheet, sheet: ParsedSheet): boolean {
       };
       const loose = v.match(/^(\d+)\s+(?:m[aá]s\s+)?sueltos?/i);
       if (SERIAL_RE.test(v)) {
-        sheet.rows.push({ ...base, sourceId: `excel:${ws.name}:${ws.getColumn(c).letter}${r}`, serial: v, notes: null, quantity: null });
+        sheet.rows.push({ ...base, sourceId: `excel:${ws.name}:${ws.getColumn(c).letter}${r}`, serial: cleanSerial(v), notes: null, quantity: null });
       } else if (loose) {
         sheet.rows.push({
           ...base, sourceId: `excel:${ws.name}:${ws.getColumn(c).letter}${r}`, serial: null,

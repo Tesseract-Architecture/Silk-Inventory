@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAdmin, requireWrite } from '../auth/auth.js';
 import { db, locationPaths, logMovement, nextItemCode } from '../db/db.js';
 import { formatDateAr } from '../lib/reminders.js';
+import { cleanSerial } from '../lib/serial.js';
 
 export const ITEM_STATUSES = ['disponible', 'prestado', 'reservado', 'en_uso', 'en_reparacion', 'roto', 'baja'] as const;
 
@@ -18,7 +19,7 @@ const itemSchema = z.object({
   category_id: z.number().int().nullish(),
   brand: nullableStr,
   part_number: nullableStr,
-  serial_number: nullableStr,
+  serial_number: z.string().nullish().transform((v) => cleanSerial(v)), // saca la S que agrega el lector
   location_id: z.number().int().nullish(),
   status: z.enum(ITEM_STATUSES).default('disponible'),
   kind: z.enum(['unidad', 'consumible']).default('unidad'),
