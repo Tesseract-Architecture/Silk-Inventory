@@ -5,6 +5,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Sin permiso sobre Docker: si el usuario ya está en el grupo (pero la sesión es de antes), se vuelve
+# a correr con ese grupo; si no está, se agrega (pide la contraseña de sudo una sola vez).
+if ! docker info >/dev/null 2>&1; then
+  if [ -z "${INVENTARIO_SG:-}" ]; then
+    if ! id -nG "$USER" | grep -qw docker; then
+      echo "Tu usuario no puede usar Docker: lo agrego al grupo docker (pide la contraseña)."
+      sudo usermod -aG docker "$USER"
+    fi
+    exec env INVENTARIO_SG=1 sg docker -c "bash '$PWD/deploy/update.sh'"
+  fi
+  echo "No se puede usar Docker ni con el grupo docker. Probá: sudo systemctl status docker" >&2
+  exit 1
+fi
+
 before=$(git rev-parse --short HEAD)
 git pull --ff-only
 after=$(git rev-parse --short HEAD)
