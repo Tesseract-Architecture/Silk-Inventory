@@ -6,10 +6,12 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import {
-  IconBrandWhatsapp, IconBrandWindows, IconDatabase, IconDownload, IconEdit, IconFileSpreadsheet, IconPlus, IconSettings, IconTags, IconTrash,
+  IconBrandWhatsapp, IconBrandWindows, IconDatabase, IconRefresh, IconDownload, IconEdit, IconFileSpreadsheet, IconPlus, IconSettings, IconTags, IconTrash,
 } from '@tabler/icons-react';
 import { api, type User, useCategories, useMe, useRefresh } from '../api';
 import SsoTab from '../components/SsoTab';
+import UpdatesTab from '../components/UpdatesTab';
+import { useSearchParams } from 'react-router-dom';
 import { fmtDateTime, fmtPhone, notifyError, notifyOk } from '../util';
 
 // ---------------- WhatsApp ----------------
@@ -61,10 +63,12 @@ function WhatsAppTab() {
       )}
       {wa?.status === 'conectando' && <Loader />}
       {wa?.status === 'esperando_qr' && wa.qr && (
-        <Card withBorder w={340}>
-          <Image src={wa.qr} alt="QR de WhatsApp" />
+        <Card withBorder w={440} maw="100%" p="sm">
+          {/* Fondo blanco propio: en modo oscuro el lector del celular necesita contraste alrededor. */}
+          <Image src={wa.qr} alt="QR de WhatsApp" bg="white" radius="sm" style={{ imageRendering: 'pixelated' }} />
           <Text size="sm" ta="center" mt="xs">
-            Escaneá con WhatsApp → Dispositivos vinculados
+            En el celular: WhatsApp → <b>Dispositivos vinculados</b> → <b>Vincular un dispositivo</b>, y apuntá a este código.
+            Cambia cada unos segundos; si se vence, tocá Vincular de nuevo.
           </Text>
         </Card>
       )}
@@ -606,10 +610,13 @@ function BackupsTab() {
 }
 
 export default function Admin() {
+  // ?tab=updates (desde el aviso de versión nueva) abre directo esa pestaña.
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') ?? 'whatsapp';
   return (
     <Stack>
       <Title order={2}>Administración</Title>
-      <Tabs defaultValue="whatsapp" keepMounted={false}>
+      <Tabs value={tab} onChange={(t) => setParams(t ? { tab: t } : {}, { replace: true })} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="whatsapp" leftSection={<IconBrandWhatsapp size={16} />}>
             WhatsApp
@@ -629,6 +636,9 @@ export default function Admin() {
           <Tabs.Tab value="backups" leftSection={<IconDatabase size={16} />}>
             Backups
           </Tabs.Tab>
+          <Tabs.Tab value="updates" leftSection={<IconRefresh size={16} />}>
+            Actualizaciones
+          </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="whatsapp" pt="md">
           <WhatsAppTab />
@@ -647,6 +657,9 @@ export default function Admin() {
         </Tabs.Panel>
         <Tabs.Panel value="backups" pt="md">
           <BackupsTab />
+        </Tabs.Panel>
+        <Tabs.Panel value="updates" pt="md">
+          <UpdatesTab />
         </Tabs.Panel>
       </Tabs>
     </Stack>

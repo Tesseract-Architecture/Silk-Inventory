@@ -2,9 +2,11 @@
 // recordatorios de los préstamos que hicieron) aunque todavía no hayan entrado nunca.
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ActionIcon, Badge, Button, Card, Group, Select, Stack, Table, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import {
+  ActionIcon, Badge, Button, Card, Group, Modal, Select, Stack, Table, Text, Textarea, TextInput, Title, Tooltip,
+} from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconBrandWhatsapp, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconBrandWhatsapp, IconPlus, IconTrash, IconUsersPlus } from '@tabler/icons-react';
 import { api, isAdmin, type Role, useMe } from '../api';
 import { fmtDateTime, fmtPhone, notifyError, notifyOk } from '../util';
 
@@ -68,6 +70,21 @@ export default function Team() {
   const [phone, setPhone] = useState('');
   const suggested = emailFromName(name, domain);
 
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const addBulk = async () => {
+    try {
+      const r = await api<{ added: string[]; existing: string[]; rejected: string[] }>('/api/team/bulk', { body: { text: bulkText } });
+      notifyOk(`Agregados: ${r.added.length}${r.existing.length ? ` · ya estaban: ${r.existing.length}` : ''}`);
+      if (r.rejected.length) notifyError(new Error(`No son del dominio de la empresa: ${r.rejected.join(', ')}`));
+      setBulkText('');
+      setBulkOpen(false);
+      reload();
+    } catch (e) {
+      notifyError(e);
+    }
+  };
+
   const reload = () => {
     for (const k of ['team', 'me', 'users-list', 'loans']) qc.invalidateQueries({ queryKey: [k] });
   };
@@ -106,7 +123,35 @@ export default function Team() {
 
   return (
     <Stack>
-      <Title order={2}>Equipo</Title>
+      <Group justify="space-between">
+        <Title order={2}>Equipo</Title>
+        {admin && (
+          <Button variant="default" leftSection={<IconUsersPlus size={16} />} onClick={() => setBulkOpen(true)}>
+            Agregar varios
+          </Button>
+        )}
+      </Group>
+      <Modal opened={bulkOpen} onClose={() => setBulkOpen(false)} title="Agregar varios" size="lg">
+        <Stack>
+          <Text size="sm" c="dimmed">
+            Pegá los mails (separados por espacios, comas o uno por renglón). El nombre sale del mail y se corrige solo cuando cada uno entra
+            con Microsoft. Los que ya están no se duplican.
+          </Text>
+          <Textarea
+            autosize
+            minRows={5}
+            data-autofocus
+            placeholder="julio.rosal@silk-technologies.com paula.moroni@silk-technologies.com …"
+            value={bulkText}
+            onChange={(e) => setBulkText(e.currentTarget.value)}
+          />
+          <Group justify="flex-end">
+            <Button onClick={addBulk} disabled={!bulkText.includes('@')}>
+              Agregar
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
       <Text size="sm" c="dimmed">
         La gente de Silk. Cuando alguien presta algo, el recordatorio para reclamarlo le llega a su WhatsApp. Cada uno entra con su cuenta de
         Microsoft ({domain ? `@${domain}` : 'mail de la empresa'}) y queda vinculado por el mail.

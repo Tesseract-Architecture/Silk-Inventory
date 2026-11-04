@@ -13,7 +13,21 @@ import { config } from '../config.js';
 
 export type WaStatus = 'deshabilitado' | 'desconectado' | 'conectando' | 'esperando_qr' | 'conectado';
 
+// Baileys es muy ruidoso: solo advertencias. Los pasos de la vinculación van por `log`.
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'warn' });
+const log = pino({ level: 'info', base: { modulo: 'whatsapp' } });
+
+const REASONS: Record<number, string> = {
+  [DisconnectReason.loggedOut]: 'sesión cerrada desde el teléfono',
+  [DisconnectReason.restartRequired]: 'WhatsApp pide reiniciar la conexión (normal después de escanear)',
+  [DisconnectReason.timedOut]: 'se venció el QR sin escanear o se perdió la conexión', // 408 (= connectionLost)
+  [DisconnectReason.connectionClosed]: 'conexión cerrada',
+  [DisconnectReason.connectionReplaced]: 'otra sesión reemplazó a esta',
+  [DisconnectReason.badSession]: 'sesión dañada',
+  [DisconnectReason.multideviceMismatch]: 'el teléfono no acepta dispositivos vinculados',
+  [DisconnectReason.forbidden]: 'WhatsApp rechazó la conexión',
+  [DisconnectReason.unavailableService]: 'servicio de WhatsApp no disponible',
+};
 
 let sock: WASocket | null = null;
 let status: WaStatus = config.whatsappEnabled ? 'desconectado' : 'deshabilitado';
@@ -59,28 +73,41 @@ export async function connect(): Promise<void> {
     auth: state,
     version,
     logger,
-    browser: Browsers.ubuntu('Inventario'),
+    // Tiene que ser un navegador real: con nombres inventados WhatsApp rechaza el vínculo
+    // ("No se pudo vincular el dispositivo"). En el celular aparece como "Chrome (Ubuntu)".
+    browser: Browsers.ubuntu('Chrome'),
     markOnlineOnConnect: false,
     syncFullHistory: false,
   });
   sock = s;
 
-  s.ev.on('creds.update', saveCreds);
+  log.info({ version, linked }, 'Conectando con WhatsApp');
+  s.ev.on('creds.update', async () => {
+    await saveCreds();
+    if (s.authState.creds.me && !me) log.info({ me: s.authState.creds.me.id }, 'Vinculación aceptada por el teléfono');
+  });
   s.ev.on('connection.update', async (u) => {
     if (sock !== s) return;
     if (u.qr) {
       status = 'esperando_qr';
-      qrDataUrl = await QRCode.toDataURL(u.qr, { margin: 1, width: 300 });
+      // SVG (nítido a cualquier tamaño), corrección "L" como WhatsApp Web (menos módulos) y el margen
+      // blanco estándar de 4 módulos. Un PNG achicado en pantalla queda borroso y el celular no lo lee.
+      const svg = await QRCode.toString(u.qr, { type: 'svg', errorCorrectionLevel: 'L', margin: 4 });
+      qrDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+      log.info('QR nuevo listo para escanear');
     }
     if (u.connection === 'open') {
       status = 'conectado';
       qrDataUrl = null;
+      lastError = null;
       reconnectAttempts = 0;
       me = s.user?.id?.split(':')[0].split('@')[0] ?? null;
-      logger.info({ me }, 'WhatsApp conectado');
+      log.info({ me }, 'WhatsApp conectado');
     }
     if (u.connection === 'close') {
-      const code = (u.lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)?.output?.statusCode;
+      const err = u.lastDisconnect?.error as { output?: { statusCode?: number }; message?: string } | undefined;
+      const code = err?.output?.statusCode;
+      log.warn({ code, reason: code ? REASONS[code] : undefined, error: err?.message }, 'Conexión con WhatsApp cerrada');
       sock = null;
       qrDataUrl = null;
       status = 'desconectado';
@@ -96,8 +123,10 @@ export async function connect(): Promise<void> {
         // Vinculado (o recién vinculado: WhatsApp pide reiniciar): reconectar con espera creciente.
         const delay = code === DisconnectReason.restartRequired ? 500 : Math.min(60_000, 2_000 * 2 ** reconnectAttempts++);
         reconnectTimer = setTimeout(() => connect().catch((e) => (lastError = String(e))), delay);
-      } else {
+      } else if (code === DisconnectReason.timedOut || code === undefined) {
         lastError = 'Se venció el código QR. Tocá "Vincular" de nuevo.';
+      } else {
+        lastError = `WhatsApp cortó la vinculación: ${REASONS[code] ?? 'motivo desconocido'} (código ${code}). Probá de nuevo; si se repite, mirá los logs del server.`;
       }
     }
   });

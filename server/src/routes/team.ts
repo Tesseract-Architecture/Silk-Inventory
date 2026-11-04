@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { config } from '../config.js';
 import { db } from '../db/db.js';
 import { normalizePhone } from '../lib/phone.js';
-import { emailFromName } from '../lib/team.js';
+import { emailFromName, extractEmails, nameFromEmail } from '../lib/team.js';
 
 const ROLES = ['admin', 'usuario', 'lectura'];
 
@@ -62,6 +62,28 @@ export async function teamRoutes(app: FastifyInstance) {
       .prepare('INSERT INTO users (name, email, phone, role) VALUES (?, ?, ?, ?)')
       .run(v.name, v.email, v.phone ?? null, v.role ?? 'usuario').lastInsertRowid;
     return { id: Number(id) };
+  });
+
+  // Varios de una: se pega una lista de mails y se crean los que falten (nombre sacado del mail).
+  app.post('/api/team/bulk', async (req, reply) => {
+    if (req.user!.role !== 'admin') return reply.code(403).send({ error: 'Solo administradores' });
+    const emails = extractEmails(String((req.body as { text?: string } | undefined)?.text ?? ''));
+    if (!emails.length) return reply.code(400).send({ error: 'No encontré ningún mail en lo que pegaste' });
+    const domains = config.allowedDomains.length ? config.allowedDomains : [config.teamEmailDomain];
+    const exists = db.prepare('SELECT 1 FROM users WHERE email = ?');
+    const insert = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'usuario')");
+    const result = { added: [] as string[], existing: [] as string[], rejected: [] as string[] };
+    db.transaction(() => {
+      for (const email of emails) {
+        if (!domains.includes(email.split('@')[1])) result.rejected.push(email);
+        else if (exists.get(email)) result.existing.push(email);
+        else {
+          insert.run(nameFromEmail(email), email);
+          result.added.push(email);
+        }
+      }
+    })();
+    return result;
   });
 
   // Admin edita todo; cada uno puede editar su propio WhatsApp.

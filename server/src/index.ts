@@ -13,6 +13,7 @@ import { adminRoutes } from './routes/admin.js';
 import { activityRoutes } from './routes/activity.js';
 import { notifyRoutes } from './routes/notify.js';
 import { teamRoutes } from './routes/team.js';
+import { versionRoutes } from './routes/version.js';
 import { initWhatsApp } from './whatsapp/client.js';
 import { startScheduler } from './jobs/scheduler.js';
 
@@ -65,6 +66,7 @@ await app.register(adminRoutes);
 await app.register(activityRoutes);
 await app.register(notifyRoutes);
 await app.register(teamRoutes);
+await app.register(versionRoutes);
 
 app.get('/healthz', async () => ({ ok: true }));
 

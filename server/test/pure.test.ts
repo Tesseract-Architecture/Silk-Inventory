@@ -106,3 +106,16 @@ describe('emailFromName', () => {
     expect(emailFromName('Fer', 'silk-technologies.com')).toBe('fer@silk-technologies.com');
   });
 });
+
+describe('carga de equipo', () => {
+  it('saca mails de un texto pegado y arma el nombre', async () => {
+    const { extractEmails, nameFromEmail } = await import('../src/lib/team.js');
+    const pegado = 'mateo.szumowski@silk-technologies.com matias.anon@silk-technologies.com,\nJULIO.ROSAL@silk-technologies.com; julio.rosal@silk-technologies.com';
+    expect(extractEmails(pegado)).toEqual([
+      'mateo.szumowski@silk-technologies.com',
+      'matias.anon@silk-technologies.com',
+      'julio.rosal@silk-technologies.com',
+    ]);
+    expect(nameFromEmail('anahi.centurion@silk-technologies.com')).toBe('Anahi Centurion');
+  });
+});

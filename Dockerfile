@@ -12,6 +12,10 @@ RUN npm run build && npm prune --omit=dev
 # ---- runtime ----
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production TZ=America/Argentina/Buenos_Aires DATA_DIR=/data PORT=8080
+# Qué versión está corriendo (lo pasa deploy/update.sh): la app lo compara con GitHub.
+ARG GIT_COMMIT=desconocido
+ARG BUILD_DATE=
+ENV GIT_COMMIT=$GIT_COMMIT BUILD_DATE=$BUILD_DATE
 RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/node_modules node_modules

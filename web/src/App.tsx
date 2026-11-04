@@ -8,7 +8,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconAlertTriangle, IconBox, IconBrandWhatsapp, IconBuilding, IconUsers, IconHandGrab, IconHistory, IconLayoutDashboard, IconLogout, IconMapPin,
-  IconMoon, IconPlugConnected, IconSearch, IconSettings, IconSun,
+  IconMoon, IconPlugConnected, IconRefresh, IconSearch, IconSettings, IconSun,
 } from '@tabler/icons-react';
 import { api, isAdmin, useMe } from './api';
 import Login from './pages/Login';
@@ -26,6 +26,7 @@ import Team from './pages/Team';
 import Sfps from './pages/Sfps';
 import MyPhoneModal from './components/MyPhoneModal';
 import SilkLogo from './components/SilkLogo';
+import { useVersion } from './components/UpdatesTab';
 import { fmtPhone } from './util';
 
 const NAV = [
@@ -58,6 +59,20 @@ export default function App() {
 }
 
 /** Aviso arriba de todo cuando WhatsApp no está conectado (no salen los recordatorios). */
+/** Solo admins: aviso cuando en GitHub hay una versión más nueva que la que corre. */
+function UpdateBanner() {
+  const { data } = useVersion();
+  if (!data?.pending?.length) return null;
+  return (
+    <Alert color="blue" icon={<IconRefresh />} mb="md" className="no-print" title="Hay una versión nueva de la app">
+      {data.pending.length} {data.pending.length === 1 ? 'cambio' : 'cambios'} sin instalar.{' '}
+      <Anchor component={RouterLink} to="/admin?tab=updates" inherit fw={600}>
+        Ver cómo actualizar
+      </Anchor>
+    </Alert>
+  );
+}
+
 function WhatsAppBanner({ admin }: { admin: boolean }) {
   const { data } = useQuery({
     queryKey: ['wa-status'],
@@ -184,6 +199,7 @@ function Shell() {
 
       <AppShell.Main>
         <WhatsAppBanner admin={isAdmin(user)} />
+        {isAdmin(user) && <UpdateBanner />}
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventario" element={<Inventory />} />

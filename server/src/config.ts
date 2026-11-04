@@ -44,6 +44,9 @@ export const config = {
   adminEmails: list('ADMIN_EMAILS'),
 
   whatsappEnabled: env('WHATSAPP_ENABLED', '1') === '1',
+
+  // Repo público de donde se actualiza: la app compara su commit con el último de acá.
+  githubRepo: env('GITHUB_REPO', 'Tesseract-Architecture/Silk-Inventory'),
 };
 
 export const isProd = process.env.NODE_ENV === 'production';
