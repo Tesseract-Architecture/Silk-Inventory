@@ -5,6 +5,9 @@ services:
     env_file: .env
     volumes:
       - ./data:/data
+    # La app no necesita ningún privilegio del kernel (escucha en el 8080).
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     # Sin Caddy: descomentar para entrar directo por http://<server>:8080
     # ports:
     #   - "8080:8080"
@@ -14,6 +17,7 @@ services:
     image: caddy:2
     restart: unless-stopped
     depends_on: [app]
+    security_opt: [no-new-privileges:true]
     ports:
       - "80:80"
       - "443:443"

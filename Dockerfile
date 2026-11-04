@@ -18,6 +18,9 @@ COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/dist dist
 COPY --from=build /app/web/dist web/dist
 COPY package.json ./
+# Sin root: el usuario "node" (uid 1000) es el mismo dueño que ./data en el server.
+RUN mkdir -p /data && chown node:node /data
+USER node
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://localhost:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

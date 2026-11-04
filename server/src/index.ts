@@ -30,6 +30,32 @@ const app = Fastify({
 
 await app.register(cookie, { secret: config.sessionSecret });
 await app.register(multipart, { limits: { fileSize: 30 * 1024 * 1024 } });
+// Encabezados de seguridad (también con acceso directo a la VM, sin pasar por el nginx de la oficina).
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'", // Mantine usa estilos inline
+  "img-src 'self' data:", // QR y logos
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+app.addHook('onSend', async (_req, reply) => {
+  reply.header('Content-Security-Policy', CSP);
+  reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  reply.header('Cross-Origin-Opener-Policy', 'same-origin');
+});
+
+app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
+  req.log.error(err);
+  // Los 4xx son errores del pedido y se pueden mostrar; los 500 quedan en el log, sin detalles hacia afuera.
+  if (err.statusCode && err.statusCode < 500) return reply.code(err.statusCode).send({ error: err.message });
+  return reply.code(500).send({ error: 'Error interno del servidor' });
+});
+
 installAuth(app);
 await app.register(authRoutes);
 await app.register(itemRoutes);
@@ -51,11 +77,6 @@ if (fs.existsSync(webDist)) {
     return reply.sendFile('index.html');
   });
 }
-
-app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
-  req.log.error(err);
-  reply.code(err.statusCode && err.statusCode < 500 ? err.statusCode : 500).send({ error: err.message || 'Error interno' });
-});
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
 startScheduler(app.log);
