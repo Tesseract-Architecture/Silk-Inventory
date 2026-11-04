@@ -12,7 +12,7 @@ import { api, ApiError, canWrite, type Item, type ModelStock, useCategories, use
 import { locationOptions, norm, notifyError, notifyOk, STATUS } from '../util';
 
 // La categoría de los SFP se reconoce por el nombre ("SFP y transceivers", "SFP / Ópticos"…), así un renombre no la rompe.
-const isSfpCategory = (name: string) => /^sfp/i.test(name.trim());
+const isSfpCategory = (name: string) => /^sfp/i.test(name.trim());
 
 interface Column {
   model: string;
