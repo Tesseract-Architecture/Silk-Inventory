@@ -1,0 +1,9 @@
+# SITE_ADDRESS (en .env) es el nombre con el que entran al server, ej. inventario.silk.local
+# - Nombre interno: Caddy genera un certificado propio (los navegadores lo marcan la 1ra vez;
+#   se puede instalar la CA de Caddy en las PCs o usar "tls internal" como abajo).
+# - Dominio público apuntando al server: borrar "tls internal" y Caddy saca Let's Encrypt solo.
+{$SITE_ADDRESS} {
+	tls internal
+	encode gzip
+	reverse_proxy app:8080
+}

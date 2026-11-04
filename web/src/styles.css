@@ -1,0 +1,108 @@
+body {
+  background: var(--mantine-color-body);
+}
+
+/* Zona del logo en el encabezado: alineada con el menú lateral (AppShell navbar: 170px desde sm). */
+@media (min-width: 48em) {
+  .header-brand {
+    width: 170px;
+    box-sizing: border-box;
+    justify-content: center;
+    border-right: 1px solid var(--app-shell-border-color);
+  }
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+/* Series en la vista de SFPs: se resalta la que está debajo del mouse */
+.serial-cell {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+}
+.serial-cell:hover,
+.serial-cell:focus-visible {
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+.serial-cell:hover * {
+  color: inherit;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+.tree-node {
+  border-radius: var(--mantine-radius-sm);
+}
+
+/* Impresión: solo el contenido marcado */
+@media print {
+  .no-print,
+  .mantine-AppShell-header,
+  .mantine-AppShell-navbar {
+    display: none !important;
+  }
+  .mantine-AppShell-main {
+    padding: 0 !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
+
+.labels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62mm, 1fr));
+  gap: 3mm;
+}
+
+.label {
+  border: 1px dashed #bbb;
+  padding: 2mm;
+  display: flex;
+  gap: 2mm;
+  align-items: center;
+  height: 30mm;
+  overflow: hidden;
+  break-inside: avoid;
+  background: #fff;
+  color: #000;
+}
+
+.label img {
+  width: 26mm;
+  height: 26mm;
+  flex: none;
+}
+
+.label .code {
+  font-weight: 700;
+  font-size: 11pt;
+}
+
+.label .desc {
+  font-size: 8pt;
+  line-height: 1.2;
+  max-height: 3.6em;
+  overflow: hidden;
+}
+
+.label .sn {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 7.5pt;
+}
+
+@media print {
+  .label {
+    border-color: #ddd;
+  }
+  @page {
+    margin: 8mm;
+  }
+}

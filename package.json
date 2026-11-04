@@ -1,0 +1,37 @@
+{
+  "name": "inventario",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server/src/index.ts",
+    "dev:web": "npm --prefix web run dev",
+    "build": "tsc -p tsconfig.json && npm --prefix web run build",
+    "start": "node dist/index.js",
+    "import": "tsx server/src/import/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/multipart": "^10.1.7",
+    "@fastify/static": "^10.1.8",
+    "baileys": "^7.0.0-rc14",
+    "better-sqlite3": "^13.0.3",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.12.8",
+    "node-cron": "^4.6.0",
+    "openid-client": "^6.8.9",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
