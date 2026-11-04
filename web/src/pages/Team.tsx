@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActionIcon, Badge, Button, Card, Group, Select, Stack, Table, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconBrandWhatsapp, IconBrandWindows, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconBrandWhatsapp, IconPlus, IconTrash } from '@tabler/icons-react';
 import { api, isAdmin, type Role, useMe } from '../api';
 import { fmtDateTime, fmtPhone, notifyError, notifyOk } from '../util';
 
@@ -86,20 +86,6 @@ export default function Team() {
     }
   };
 
-  const [syncing, setSyncing] = useState(false);
-  const syncMicrosoft = async () => {
-    setSyncing(true);
-    try {
-      const r = await api<{ found: number; added: number; phones: number }>('/api/team/sync-microsoft', { method: 'POST', body: {} });
-      notifyOk(`Microsoft: ${r.found} personas · ${r.added} nuevas · ${r.phones} WhatsApp completados`);
-      reload();
-    } catch (e) {
-      notifyError(e);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const update = (id: number, body: Partial<Person>) =>
     api(`/api/team/${id}`, { method: 'PUT', body }).then(() => {
       notifyOk('Guardado');
@@ -120,16 +106,7 @@ export default function Team() {
 
   return (
     <Stack>
-      <Group justify="space-between">
-        <Title order={2}>Equipo</Title>
-        {admin && (
-          <Tooltip label="Agrega a la gente de Silk desde Microsoft 365 y completa el WhatsApp con el celular de su perfil (si lo tienen)">
-            <Button variant="default" leftSection={<IconBrandWindows size={16} />} onClick={syncMicrosoft} loading={syncing}>
-              Traer de Microsoft
-            </Button>
-          </Tooltip>
-        )}
-      </Group>
+      <Title order={2}>Equipo</Title>
       <Text size="sm" c="dimmed">
         La gente de Silk. Cuando alguien presta algo, el recordatorio para reclamarlo le llega a su WhatsApp. Cada uno entra con su cuenta de
         Microsoft ({domain ? `@${domain}` : 'mail de la empresa'}) y queda vinculado por el mail.

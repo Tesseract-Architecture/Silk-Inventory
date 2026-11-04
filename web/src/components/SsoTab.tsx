@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ActionIcon, Alert, Button, Card, Code, CopyButton, Group, List, Loader, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
-import { IconCheck, IconCopy, IconPlugConnected } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconDownload, IconPlugConnected } from '@tabler/icons-react';
+import { modals } from '@mantine/modals';
 import { api } from '../api';
 import { notifyError } from '../util';
 
@@ -12,6 +13,8 @@ interface SsoInfo {
   tenantId: string;
   clientId: string;
   hasSecret: boolean;
+  authMethod: 'secreto' | 'certificado' | null;
+  certificate: { thumbprint: string; validFrom: string; validTo: string } | null;
   allowedDomains: string[];
   devLogin: boolean;
 }
@@ -31,9 +34,10 @@ function Copy({ value }: { value: string }) {
 }
 
 export default function SsoTab() {
-  const { data } = useQuery({ queryKey: ['sso'], queryFn: () => api<SsoInfo>('/api/admin/sso') });
+  const { data, refetch } = useQuery({ queryKey: ['sso'], queryFn: () => api<SsoInfo>('/api/admin/sso') });
+  const [generating, setGenerating] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string; graphUsers?: boolean } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   if (!data) return <Loader />;
 
   const test = async () => {
@@ -47,7 +51,34 @@ export default function SsoTab() {
     }
   };
 
-  const configured = !!(data.tenantId && data.clientId && data.hasSecret);
+  const configured = !!(data.tenantId && data.clientId && data.authMethod);
+
+  const generate = (replace: boolean) => {
+    const run = async () => {
+      setGenerating(true);
+      try {
+        await api(`/api/admin/sso/certificate${replace ? '?replace=1' : ''}`, { method: 'POST', body: {} });
+        setResult(null);
+        refetch();
+      } catch (e) {
+        notifyError(e);
+      } finally {
+        setGenerating(false);
+      }
+    };
+    if (!replace) return run();
+    modals.openConfirmModal({
+      title: 'Generar un certificado nuevo',
+      children: (
+        <Text size="sm">
+          El login con Microsoft deja de andar hasta que subas el certificado nuevo a Entra. Hacelo solo para renovarlo antes de que venza.
+        </Text>
+      ),
+      labels: { confirm: 'Generar', cancel: 'Cancelar' },
+      confirmProps: { color: 'red' },
+      onConfirm: run,
+    });
+  };
   return (
     <Stack maw={780}>
       <Text size="sm" c="dimmed">
@@ -106,8 +137,12 @@ export default function SsoTab() {
               <Table.Td>{data.clientId ? <Code>{data.clientId}</Code> : <Text c="red">falta ENTRA_CLIENT_ID</Text>}</Table.Td>
             </Table.Tr>
             <Table.Tr>
-              <Table.Td>Secreto de cliente</Table.Td>
-              <Table.Td>{data.hasSecret ? 'cargado' : <Text c="red">falta ENTRA_CLIENT_SECRET (la columna "Valor")</Text>}</Table.Td>
+              <Table.Td>Credencial</Table.Td>
+              <Table.Td>
+                {data.authMethod === 'secreto' && 'secreto de cliente (ENTRA_CLIENT_SECRET)'}
+                {data.authMethod === 'certificado' && 'certificado (ver abajo)'}
+                {!data.authMethod && <Text c="red">falta: generá el certificado de abajo</Text>}
+              </Table.Td>
             </Table.Tr>
             <Table.Tr>
               <Table.Td>Dominios permitidos</Table.Td>
@@ -128,16 +163,54 @@ export default function SsoTab() {
         {result && (
           <Alert color={result.ok ? 'teal' : 'red'} mt="sm" title={result.ok ? 'Funciona' : 'No funciona'}>
             {result.message}
-            {result.ok && (
-              <Text size="sm" mt={4}>
-                {result.graphUsers
-                  ? '"Equipo → Traer de Microsoft" también va a funcionar.'
-                  : 'Para "Equipo → Traer de Microsoft" falta el permiso de aplicación User.Read.All con consentimiento de administrador.'}
-              </Text>
-            )}
           </Alert>
         )}
       </Card>
+
+      {!data.hasSecret && (
+        <Card withBorder>
+          <Title order={5} mb="xs">
+            Certificado (en lugar del secreto)
+          </Title>
+          <Text size="sm" c="dimmed" mb="sm">
+            En Silk los secretos de cliente están bloqueados por directiva, así que la app se identifica con un certificado. La clave
+            privada queda en el server; a Entra se sube solo el <b>.cer</b> en <b>Certificados y secretos → Certificados → Cargar certificado</b>.
+          </Text>
+          {data.certificate ? (
+            <>
+              <Table>
+                <Table.Tbody>
+                  <Table.Tr>
+                    <Table.Td w={220}>Huella digital</Table.Td>
+                    <Table.Td>
+                      <Code>{data.certificate.thumbprint}</Code>
+                    </Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td>Vence</Table.Td>
+                    <Table.Td>{data.certificate.validTo.slice(0, 10).split('-').reverse().join('/')}</Table.Td>
+                  </Table.Tr>
+                </Table.Tbody>
+              </Table>
+              <Text size="xs" c="dimmed" mt={4}>
+                En Entra tiene que aparecer un certificado con esta misma huella.
+              </Text>
+              <Group mt="sm">
+                <Button component="a" href="/api/admin/sso/certificate.cer" leftSection={<IconDownload size={16} />}>
+                  Descargar .cer para Entra
+                </Button>
+                <Button variant="subtle" color="red" onClick={() => generate(true)} loading={generating}>
+                  Renovar (generar otro)
+                </Button>
+              </Group>
+            </>
+          ) : (
+            <Button onClick={() => generate(false)} loading={generating}>
+              Generar certificado
+            </Button>
+          )}
+        </Card>
+      )}
 
       <Card withBorder>
         <Title order={5} mb="xs">
@@ -151,7 +224,7 @@ export default function SsoTab() {
             <b>AADSTS700016</b>: Client ID o tenant equivocado.
           </List.Item>
           <List.Item>
-            Volvés de Microsoft y da error: casi siempre es el secreto (se pegó el <b>Id. de secreto</b> en vez del <b>Valor</b>, o venció).
+            <b>AADSTS700027</b>: Entra no tiene subido el certificado de la app (o es otro): bajá el .cer y subilo de nuevo.
           </List.Item>
           <List.Item>
             El error real se ve en Entra → Supervisión → Registros de inicio de sesión (tardan 5 a 15 minutos en aparecer).

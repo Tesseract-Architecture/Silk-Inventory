@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { redirectUri, requireAdmin, testEntra } from '../auth/auth.js';
+import { entraAuthMethod, redirectUri, requireAdmin, resetEntra, testEntra } from '../auth/auth.js';
+import { certInfo, generateCert, readCertPem } from '../auth/entraCert.js';
 import { db, defaultSettings, getSettings, locationPaths, RESTORE_PENDING, saveSettings } from '../db/db.js';
 import { todayLocal } from '../lib/dates.js';
 import { normalizePhone } from '../lib/phone.js';
@@ -83,10 +84,31 @@ export async function adminRoutes(app: FastifyInstance) {
       tenantId: config.entra.tenantId,
       clientId: config.entra.clientId,
       hasSecret: !!config.entra.clientSecret,
+      authMethod: entraAuthMethod(),
+      certificate: certInfo(),
       allowedDomains: config.allowedDomains,
       devLogin: config.authDev,
     }));
     admin.post('/api/admin/sso/test', async () => testEntra());
+
+    // Certificado en lugar del secreto (en Silk los secretos están bloqueados por directiva).
+    admin.post('/api/admin/sso/certificate', async (req, reply) => {
+      if (certInfo() && (req.query as { replace?: string }).replace !== '1') {
+        return reply.code(409).send({ error: 'Ya hay un certificado. Generar otro invalida el actual hasta que subas el nuevo a Entra.' });
+      }
+      const info = await generateCert();
+      resetEntra();
+      req.log.warn({ by: req.user!.email, thumbprint: info.thumbprint }, 'Certificado de Entra generado');
+      return info;
+    });
+    // Solo la parte pública: es lo que se sube a Entra.
+    admin.get('/api/admin/sso/certificate.cer', async (_req, reply) => {
+      if (!certInfo()) return reply.code(404).send({ error: 'Todavía no hay certificado' });
+      return reply
+        .header('Content-Type', 'application/x-x509-ca-cert')
+        .header('Content-Disposition', 'attachment; filename="inventario-entra.cer"')
+        .send(readCertPem());
+    });
 
     admin.get('/api/admin/settings', async () => ({ settings: getSettings(), defaults: defaultSettings }));
 

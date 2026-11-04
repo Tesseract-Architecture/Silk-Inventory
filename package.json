@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "import": "tsx server/src/import/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "entra-cert": "tsx server/src/auth/entra-cert-cli.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
@@ -24,6 +25,7 @@
     "openid-client": "^6.8.9",
     "pino": "^10.4.0",
     "qrcode": "^1.5.4",
+    "selfsigned": "^5.5.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

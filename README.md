@@ -68,12 +68,10 @@ Es el mismo proceso que se usó con **Silk Pilot** (guía `SSO-Microsoft-Entra.m
 3. **Certificados y secretos → + Nuevo secreto de cliente** (24 meses) → copiar la columna **Valor**
    (no el "Id. de secreto") → `ENTRA_CLIENT_SECRET`. Agendar el vencimiento.
 4. **Permisos de API** → *Conceder consentimiento de administrador para Silk Tech SRL*.
-5. Para el botón **Equipo → Traer de Microsoft**: en **Permisos de API** → *Agregar un permiso* → **Microsoft Graph** →
-   *Permisos de aplicación* → `User.Read.All`, y conceder el consentimiento de nuevo.
-6. Reiniciar (`docker compose up -d`) y en **Administración → Login Microsoft → Probar conexión** verificar que todo esté bien.
+5. Reiniciar (`docker compose up -d`) y en **Administración → Login Microsoft → Probar conexión** verificar que todo esté bien.
    Probar el login en una ventana de incógnito.
 
-Los usuarios aparecen solos la primera vez que entran (o se cargan antes en **Equipo**: se vinculan por el mail).
+Los usuarios aparecen solos la primera vez que entran (o se cargan a mano antes en **Equipo**: se vinculan por el mail).
 El primero que entra y los de `ADMIN_EMAILS` quedan como admin; los demás como "usuario".
 
 Si falla: `AADSTS50011` = la URI de redirección no coincide; `AADSTS700016` = Client ID o tenant equivocado;

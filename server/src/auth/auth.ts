@@ -4,6 +4,7 @@ import * as oidc from 'openid-client';
 import { config, isProd } from '../config.js';
 import { db } from '../db/db.js';
 import { normalizePhone } from '../lib/phone.js';
+import { certExists, certInfo, signingKey } from './entraCert.js';
 
 export interface User {
   id: number;
@@ -87,19 +88,44 @@ function domainAllowed(email: string): boolean {
 
 // ---------- Microsoft Entra ID ----------
 
+/** Cómo se autentica la app ante Entra: secreto (si hay) o certificado (data/entra). */
+export function entraAuthMethod(): 'secreto' | 'certificado' | null {
+  if (config.entra.clientSecret) return 'secreto';
+  return certExists() ? 'certificado' : null;
+}
+
+export function entraConfigured(): boolean {
+  return !!(config.entra.tenantId && config.entra.clientId && entraAuthMethod());
+}
+
 let oidcConfig: oidc.Configuration | null = null;
 async function entra(): Promise<oidc.Configuration> {
   if (oidcConfig) return oidcConfig;
   const { tenantId, clientId, clientSecret } = config.entra;
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error('Falta configurar ENTRA_TENANT_ID / ENTRA_CLIENT_ID / ENTRA_CLIENT_SECRET en .env');
+  const method = entraAuthMethod();
+  if (!tenantId || !clientId || !method) {
+    throw new Error('Falta configurar Entra: ENTRA_TENANT_ID, ENTRA_CLIENT_ID y un secreto o un certificado');
   }
-  oidcConfig = await oidc.discovery(
-    new URL(`https://login.microsoftonline.com/${tenantId}/v2.0`),
-    clientId,
-    clientSecret,
-  );
+  const issuer = new URL(`https://login.microsoftonline.com/${tenantId}/v2.0`);
+  if (method === 'secreto') {
+    oidcConfig = await oidc.discovery(issuer, clientId, clientSecret);
+  } else {
+    // private_key_jwt: Entra pide la huella del certificado en "x5t" y el endpoint de tokens como "aud".
+    const { x5t } = certInfo()!;
+    const auth = oidc.PrivateKeyJwt(await signingKey(), {
+      [oidc.modifyAssertion]: (header, payload) => {
+        header.x5t = x5t;
+        payload.aud = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+      },
+    });
+    oidcConfig = await oidc.discovery(issuer, clientId, undefined, auth);
+  }
   return oidcConfig;
+}
+
+/** Al cambiar las credenciales (ej. certificado nuevo) hay que volver a armar la configuración. */
+export function resetEntra() {
+  oidcConfig = null;
 }
 
 export const redirectUri = () => `${config.appUrl}/auth/callback`;
@@ -107,6 +133,9 @@ export const redirectUri = () => `${config.appUrl}/auth/callback`;
 /** Traduce los errores típicos de Entra (ver la guía SSO de Silk) a algo accionable. */
 export function explainEntraError(e: unknown): string {
   const msg = String((e as { error_description?: string })?.error_description ?? (e as Error)?.message ?? e);
+  if (/AADSTS700027|AADSTS700024|certificate|client assertion/i.test(msg)) {
+    return 'Entra no reconoce el certificado: subí el .cer de Administración → Login Microsoft a "Certificados y secretos → Certificados" del registro.';
+  }
   if (/AADSTS7000215|invalid_client|client secret/i.test(msg)) {
     return 'El secreto de cliente es inválido o venció. Ojo: va la columna "Valor" del secreto, no el "Id. de secreto".';
   }
@@ -122,33 +151,19 @@ export function explainEntraError(e: unknown): string {
 }
 
 /**
- * Verifica tenant + Client ID + secreto pidiendo un token de aplicación (no necesita ningún usuario).
- * Si además está el permiso User.Read.All, avisa que "Traer de Microsoft" va a funcionar.
+ * Verifica tenant + Client ID + credencial (secreto o certificado) pidiendo un token de aplicación.
+ * No necesita ningún usuario ni permisos extra.
  */
-export async function testEntra(): Promise<{ ok: boolean; message: string; graphUsers?: boolean }> {
-  const { tenantId, clientId, clientSecret } = config.entra;
-  if (!tenantId || !clientId || !clientSecret) {
-    return { ok: false, message: 'Faltan datos en .env: ENTRA_TENANT_ID, ENTRA_CLIENT_ID y ENTRA_CLIENT_SECRET' };
+export async function testEntra(): Promise<{ ok: boolean; message: string }> {
+  if (!entraConfigured()) {
+    return { ok: false, message: 'Falta ENTRA_CLIENT_ID en .env o generar el certificado (o cargar un secreto)' };
   }
   try {
-    await entra();
-    const res = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
-      method: 'POST',
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-        scope: 'https://graph.microsoft.com/.default',
-      }),
-    });
-    const body = (await res.json()) as { access_token?: string; error_description?: string };
-    if (!body.access_token) return { ok: false, message: explainEntraError(body) };
-    const users = await fetch('https://graph.microsoft.com/v1.0/users?$top=1&$select=id', {
-      headers: { Authorization: `Bearer ${body.access_token}` },
-    });
-    return { ok: true, message: 'Tenant, Client ID y secreto correctos', graphUsers: users.ok };
+    resetEntra();
+    await oidc.clientCredentialsGrant(await entra(), { scope: 'https://graph.microsoft.com/.default' });
+    return { ok: true, message: `Tenant, Client ID y ${entraAuthMethod()} correctos` };
   } catch (e) {
-    oidcConfig = null;
+    resetEntra();
     return { ok: false, message: explainEntraError(e) };
   }
 }
@@ -189,7 +204,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/api/auth/me', async (req) => ({
     user: req.user,
     devLogin: config.authDev,
-    entraConfigured: !!(config.entra.tenantId && config.entra.clientId),
+    entraConfigured: entraConfigured(),
   }));
 
   app.get('/auth/login', async (req, reply) => {

@@ -1,4 +1,9 @@
+import fs from 'node:fs';
 import path from 'node:path';
+
+// Fuera de Docker (desarrollo / pruebas en una PC) se lee el .env de la carpeta del proyecto.
+// En Docker no hay .env en la imagen: las variables vienen de docker-compose (env_file).
+if (fs.existsSync('.env')) process.loadEnvFile('.env');
 
 function env(name: string, fallback = ''): string {
   return process.env[name]?.trim() || fallback;
@@ -20,6 +25,8 @@ export const config = {
   dbPath: path.join(dataDir, 'inventory.db'),
   waSessionDir: path.join(dataDir, 'wa-session'),
   backupDir: path.join(dataDir, 'backups'),
+  // Certificado para Entra (en lugar del secreto de cliente). Vive con los datos: no se sube a git.
+  entraCertDir: path.resolve(env('ENTRA_CERT_DIR', path.join(dataDir, 'entra'))),
   sessionSecret: env('SESSION_SECRET', 'dev-secret-change-me-please-32chars!!'),
   timezone: env('TZ', 'America/Argentina/Buenos_Aires'),
 
