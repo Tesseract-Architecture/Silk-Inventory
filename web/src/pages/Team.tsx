@@ -20,10 +20,11 @@ interface Person {
   active_loans: number;
 }
 
-const ROLE_OPTIONS = [
+// Los que entran por primera vez quedan en "Solo ver"; un admin les sube el permiso acá.
+export const ROLE_OPTIONS = [
+  { value: 'lectura', label: 'Solo ver (R)' },
+  { value: 'usuario', label: 'Ver y editar (RW)' },
   { value: 'admin', label: 'Administrador' },
-  { value: 'usuario', label: 'Usuario' },
-  { value: 'lectura', label: 'Solo lectura' },
 ];
 
 /** Igual que en el server: "Julio Pérez" -> "julio.perez@dominio". */
@@ -154,7 +155,7 @@ export default function Team() {
       </Modal>
       <Text size="sm" c="dimmed">
         La gente de Silk. Cuando alguien presta algo, el recordatorio para reclamarlo le llega a su WhatsApp. Cada uno entra con su cuenta de
-        Microsoft ({domain ? `@${domain}` : 'mail de la empresa'}) y queda vinculado por el mail.
+        Microsoft ({domain ? `@${domain}` : 'mail de la empresa'}) y queda vinculado por el mail. Todos arrancan en <b>Solo ver (R)</b>: cambiale el rol a quien tenga que cargar o prestar.
       </Text>
 
       {admin && (

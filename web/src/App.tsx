@@ -24,6 +24,7 @@ import Labels from './pages/Labels';
 import Stock from './pages/Stock';
 import Team from './pages/Team';
 import Sfps from './pages/Sfps';
+import { ROLE_OPTIONS } from './pages/Team';
 import MyPhoneModal from './components/MyPhoneModal';
 import SilkLogo from './components/SilkLogo';
 import { useVersion } from './components/UpdatesTab';
@@ -162,7 +163,7 @@ function Shell() {
                 <Menu.Label>
                   {user.name}
                   <br />
-                  {user.email} · {user.role}
+                  {user.email} · {ROLE_OPTIONS.find((r) => r.value === user.role)?.label ?? user.role}
                 </Menu.Label>
                 <Menu.Item
                   leftSection={<IconBrandWhatsapp size={16} />}

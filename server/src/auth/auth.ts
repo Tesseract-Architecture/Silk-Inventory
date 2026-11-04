@@ -74,7 +74,7 @@ function login(reply: FastifyReply, email: string, name: string, oid: string | n
     userId = Number(
       db
         .prepare("INSERT INTO users (oid, email, name, role, last_login) VALUES (?, ?, ?, ?, datetime('now'))")
-        .run(oid, email, name, forceAdmin ? 'admin' : 'usuario').lastInsertRowid,
+        .run(oid, email, name, forceAdmin ? 'admin' : 'lectura').lastInsertRowid,
     );
   }
   reply.setCookie('sid', createSession(userId), { ...cookieOpts, maxAge: SESSION_DAYS * 86400 });
@@ -172,7 +172,7 @@ export async function testEntra(): Promise<{ ok: boolean; message: string }> {
 
 export function requireWrite(req: FastifyRequest, reply: FastifyReply, done: () => void) {
   if (req.user?.role === 'lectura') {
-    reply.code(403).send({ error: 'Tu usuario es de solo lectura' });
+    reply.code(403).send({ error: 'Tu usuario es de solo ver (R): pedile a un administrador que te dé permiso para editar' });
     return;
   }
   done();
@@ -273,7 +273,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   // Lista para elegir responsable de un préstamo.
   app.get('/api/users', async () =>
-    db.prepare("SELECT id, name, email, phone IS NOT NULL AS has_phone FROM users WHERE role != 'lectura' ORDER BY name").all(),
+    db.prepare("SELECT id, name, email, phone IS NOT NULL AS has_phone FROM users ORDER BY name").all(),
   );
 
   app.post('/api/auth/logout', async (req, reply) => {

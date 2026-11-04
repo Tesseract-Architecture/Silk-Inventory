@@ -60,7 +60,7 @@ export async function teamRoutes(app: FastifyInstance) {
     if (exists) return reply.code(409).send({ error: `Ya existe ${exists.name} con el mail ${v.email}` });
     const id = db
       .prepare('INSERT INTO users (name, email, phone, role) VALUES (?, ?, ?, ?)')
-      .run(v.name, v.email, v.phone ?? null, v.role ?? 'usuario').lastInsertRowid;
+      .run(v.name, v.email, v.phone ?? null, v.role ?? 'lectura').lastInsertRowid;
     return { id: Number(id) };
   });
 
@@ -71,7 +71,7 @@ export async function teamRoutes(app: FastifyInstance) {
     if (!emails.length) return reply.code(400).send({ error: 'No encontré ningún mail en lo que pegaste' });
     const domains = config.allowedDomains.length ? config.allowedDomains : [config.teamEmailDomain];
     const exists = db.prepare('SELECT 1 FROM users WHERE email = ?');
-    const insert = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'usuario')");
+    const insert = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'lectura')");
     const result = { added: [] as string[], existing: [] as string[], rejected: [] as string[] };
     db.transaction(() => {
       for (const email of emails) {
@@ -123,7 +123,7 @@ export async function teamRoutes(app: FastifyInstance) {
       )
       .get(id, id, id, id) as { n: number };
     if (u.last_login || used.n) {
-      return reply.code(409).send({ error: 'Tiene actividad registrada: en vez de borrarlo, ponelo como "Solo lectura"' });
+      return reply.code(409).send({ error: 'Tiene actividad registrada: en vez de borrarlo, ponelo como "Solo ver (R)"' });
     }
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     return { ok: true };
