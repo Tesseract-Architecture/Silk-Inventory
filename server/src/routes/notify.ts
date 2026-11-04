@@ -4,12 +4,19 @@ import { requireWrite } from '../auth/auth.js';
 import { getSettings } from '../db/db.js';
 import { normalizePhone } from '../lib/phone.js';
 import {
-  activeLoans, loansSummary, responsibleMessage, sendLoansSummary, sendStockAlert, sendToResponsibles, stockAlert,
+  activeLoans, loansSummary, resolveTarget, responsibleMessage, sendLoansSummary, sendStockAlert, sendToResponsibles, stockAlert,
 } from '../jobs/reminders.js';
+import { listGroups } from '../whatsapp/client.js';
 
+/** Persona de Equipo ("user:12"), grupo ("...@g.us") o número. Vacío = el destino configurado. */
 function target(raw: unknown): string | undefined {
   const to = String(raw ?? '').trim();
   if (!to) return undefined;
+  if (/^user:\d+$/.test(to)) {
+    const phone = resolveTarget(to);
+    if (!phone) throw new Error('Esa persona no tiene el WhatsApp cargado (Equipo)');
+    return phone;
+  }
   return to.includes('@') ? to : normalizePhone(to) ?? undefined;
 }
 
@@ -34,13 +41,26 @@ export async function notifyRoutes(app: FastifyInstance) {
         text: responsibleMessage(ls),
       })),
       withoutTarget: without,
-      loansSummary: { to: s.loans_summary_to || s.internal_alert_jid, text: loansSummary() },
-      stock: { to: s.stock_alert_to || s.internal_alert_jid, text: stockAlert() },
+      // `configured`: lo elegido en Administración → Avisos (o el destino interno), tal cual se guardó.
+      loansSummary: { configured: s.loans_summary_to || s.internal_alert_jid, text: loansSummary() },
+      stock: { configured: s.stock_alert_to || s.internal_alert_jid, text: stockAlert() },
     };
   });
 
+  /** Grupos de WhatsApp para elegir destino (vacío si no está conectado). */
+  app.get('/api/notify/groups', { preHandler: requireWrite }, async () => {
+    try {
+      return await listGroups();
+    } catch {
+      return [];
+    }
+  });
+
+  /** `to` (opcional): solo a ese responsable, con todos sus préstamos activos. */
   app.post('/api/notify/responsibles', { preHandler: requireWrite }, async (req, reply) => {
-    const r = await sendToResponsibles(activeLoans(), req.user!.id);
+    const to = String((req.body as { to?: string } | undefined)?.to ?? '');
+    const loans = activeLoans().filter((l) => !to || l.remind_to === to);
+    const r = await sendToResponsibles(loans, req.user!.id);
     if (!r.sent && r.errors) return reply.code(502).send({ error: r.errorMessages.join(' · ') });
     return r;
   });

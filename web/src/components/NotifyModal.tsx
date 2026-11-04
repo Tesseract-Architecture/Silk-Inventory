@@ -1,18 +1,19 @@
 // Previsualiza y manda por WhatsApp: a cada responsable lo suyo, el resumen de préstamos o la alerta de stock.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, Group, Loader, Modal, ScrollArea, Stack, Text } from '@mantine/core';
+import { Alert, Button, Card, Group, Loader, Modal, ScrollArea, Select, Stack, Text } from '@mantine/core';
 import { IconBrandWhatsapp } from '@tabler/icons-react';
 import { api, useRefresh } from '../api';
 import { fmtPhone, notifyError, notifyOk } from '../util';
+import TargetSelect from './TargetSelect';
 
 export type NotifyKind = 'responsibles' | 'loans' | 'stock';
 
 interface Preview {
   responsibles: { to: string; name: string | null; count: number; text: string }[];
   withoutTarget: string[];
-  loansSummary: { to: string; text: string | null };
-  stock: { to: string; text: string | null };
+  loansSummary: { configured: string; text: string | null };
+  stock: { configured: string; text: string | null };
 }
 
 const TITLES: Record<NotifyKind, string> = {
@@ -45,18 +46,24 @@ function Message({ text }: { text: string }) {
 export default function NotifyModal({ kind, onClose }: { kind: NotifyKind | null; onClose: () => void }) {
   const refresh = useRefresh();
   const [sending, setSending] = useState(false);
+  /** A quién: en "responsables", '' = a todos; en los resúmenes, la persona o grupo elegido. */
+  const [to, setTo] = useState('');
   const { data, isLoading } = useQuery({
     queryKey: ['notify-preview', kind],
     queryFn: () => api<Preview>('/api/notify/preview'),
     enabled: !!kind,
   });
+  useEffect(() => {
+    if (!data || !kind) return;
+    setTo(kind === 'loans' ? data.loansSummary.configured : kind === 'stock' ? data.stock.configured : '');
+  }, [data, kind]);
 
   const send = async () => {
     setSending(true);
     try {
       const r = await api<{ sent?: number; errors?: number; skipped?: number; errorMessages?: string[] }>(ENDPOINT[kind!], {
         method: 'POST',
-        body: {},
+        body: to ? { to } : {},
       });
       if (kind === 'responsibles') {
         notifyOk(`Enviados: ${r.sent ?? 0}${r.errors ? ` · con error: ${r.errors}` : ''}${r.skipped ? ` · sin destino: ${r.skipped}` : ''}`);
@@ -74,11 +81,24 @@ export default function NotifyModal({ kind, onClose }: { kind: NotifyKind | null
   let body: React.ReactNode = null;
   let canSend = false;
   if (data && kind === 'responsibles') {
-    canSend = data.responsibles.length > 0;
+    const shown = data.responsibles.filter((r) => !to || r.to === to);
+    canSend = shown.length > 0;
     body = (
       <Stack gap="sm">
         {data.responsibles.length === 0 && <Text c="dimmed">No hay préstamos activos con a quién avisar.</Text>}
-        {data.responsibles.map((r) => (
+        {data.responsibles.length > 1 && (
+          <Select
+            label="Mandar a"
+            allowDeselect={false}
+            data={[
+              { value: '', label: 'Todos los responsables' },
+              ...data.responsibles.map((r) => ({ value: r.to, label: `${r.name ?? dest(r.to)} (${r.count})` })),
+            ]}
+            value={to}
+            onChange={(v) => setTo(v ?? '')}
+          />
+        )}
+        {shown.map((r) => (
           <div key={r.to}>
             <Text size="sm" fw={600} mb={4}>
               Para {r.name ?? 'número/grupo interno'} · {dest(r.to)} ({r.count} {r.count === 1 ? 'préstamo' : 'préstamos'})
@@ -96,13 +116,10 @@ export default function NotifyModal({ kind, onClose }: { kind: NotifyKind | null
     );
   } else if (data) {
     const part = kind === 'loans' ? data.loansSummary : data.stock;
-    canSend = !!part.to;
+    canSend = !!to;
     body = (
       <Stack gap="sm">
-        <Text size="sm" fw={600}>
-          Para: {dest(part.to) ?? 'no hay destino configurado'}
-        </Text>
-        {!part.to && <Alert color="yellow">Configurá el número o grupo interno en Administración → Avisos.</Alert>}
+        <TargetSelect label="Mandar a" value={to} onChange={setTo} clearable={false} />
         <Message text={part.text ?? (kind === 'loans' ? '✅ No hay nada prestado.' : '✅ Todo el stock está por encima del mínimo.')} />
       </Stack>
     );

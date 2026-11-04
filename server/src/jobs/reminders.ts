@@ -29,8 +29,17 @@ export interface ActiveLoan {
   item_kind: string;
 }
 
+/** Destino guardado → WhatsApp real. "user:12" es una persona de Equipo: usa el número que tenga cargado hoy. */
+export function resolveTarget(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const m = /^user:(\d+)$/.exec(v);
+  if (!m) return v;
+  const u = db.prepare('SELECT phone FROM users WHERE id = ?').get(Number(m[1])) as { phone: string | null } | undefined;
+  return u?.phone || null;
+}
+
 export function activeLoans(): ActiveLoan[] {
-  const fallback = getSettings().internal_alert_jid || null;
+  const fallback = resolveTarget(getSettings().internal_alert_jid);
   const rows = db
     .prepare(
       `SELECT l.id, l.item_id, l.quantity, l.loaned_at, l.due_date, l.returned_at, l.reminders_paused,
@@ -266,8 +275,8 @@ export async function sendToResponsibles(loans: ActiveLoan[], userId: number | n
   return r;
 }
 
-function destination(specific: string): string {
-  return specific || getSettings().internal_alert_jid;
+function destination(specific: string): string | null {
+  return resolveTarget(specific || getSettings().internal_alert_jid);
 }
 
 export async function sendLoansSummary(userId: number | null = null, to?: string): Promise<boolean> {

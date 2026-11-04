@@ -11,6 +11,8 @@ import {
 import { api, type User, useCategories, useMe, useRefresh } from '../api';
 import SsoTab from '../components/SsoTab';
 import UpdatesTab from '../components/UpdatesTab';
+import NotifyModal, { type NotifyKind } from '../components/NotifyModal';
+import TargetSelect from '../components/TargetSelect';
 import { useSearchParams } from 'react-router-dom';
 import { fmtDateTime, fmtPhone, notifyError, notifyOk } from '../util';
 
@@ -140,51 +142,10 @@ const WEEKDAY_OPTIONS = [
   { value: '7', label: 'Los domingos' },
 ];
 
-/** Número o grupo de WhatsApp. Vacío = usa el destino interno (si `fallback`). */
-function Destination({
-  label, value, onChange, groups, connected, fallback,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  groups: { id: string; name: string }[];
-  connected: boolean;
-  fallback?: boolean;
-}) {
-  const isGroup = value.includes('@g.us');
-  return (
-    <SimpleGrid cols={{ base: 1, sm: 2 }}>
-      <TextInput
-        label={label}
-        placeholder={fallback ? 'Vacío = el número/grupo interno' : '11 1234-5678'}
-        value={isGroup ? '' : value ? (/^\d+$/.test(value) ? fmtPhone(value) : value) : ''}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        disabled={isGroup}
-      />
-      <Select
-        label="…o un grupo de WhatsApp"
-        placeholder={connected ? 'Elegí un grupo' : 'Conectá WhatsApp para ver los grupos'}
-        clearable
-        searchable
-        data={groups.map((g) => ({ value: g.id, label: g.name }))}
-        value={isGroup ? value : null}
-        onChange={(v) => onChange(v ?? '')}
-      />
-    </SimpleGrid>
-  );
-}
-
 function SettingsTab() {
   const { data } = useQuery({ queryKey: ['settings'], queryFn: () => api<{ settings: Settings; defaults: Settings }>('/api/admin/settings') });
-  const { data: wa } = useQuery({ queryKey: ['wa'], queryFn: () => api<WaState>('/api/admin/whatsapp') });
-  const connected = wa?.status === 'conectado';
-  const { data: groups = [] } = useQuery({
-    queryKey: ['wa-groups'],
-    queryFn: () => api<{ id: string; name: string }[]>('/api/admin/whatsapp/groups'),
-    enabled: connected,
-  });
   const [s, setS] = useState<Settings | null>(null);
-  const [running, setRunning] = useState(false);
+  const [notify, setNotify] = useState<NotifyKind | null>(null);
   useEffect(() => {
     if (data) setS(data.settings);
   }, [data]);
@@ -197,28 +158,6 @@ function SettingsTab() {
       notifyOk('Configuración guardada');
     }, notifyError);
 
-  const runNow = async () => {
-    setRunning(true);
-    try {
-      const r = await api<{ sent: number; errors: number; skipped: number; loansSummary: boolean | string; stock: boolean | string; notes: string[] }>(
-        '/api/admin/run-jobs',
-        { method: 'POST' },
-      );
-      const parts = [`A responsables: ${r.sent} enviados`];
-      if (r.errors) parts.push(`${r.errors} con error`);
-      if (r.loansSummary === true) parts.push('resumen de préstamos enviado');
-      if (r.stock === true) parts.push('alerta de stock enviada');
-      notifyOk(parts.join(' · '));
-      const problems = [...r.notes, ...[r.loansSummary, r.stock].filter((x): x is string => typeof x === 'string')];
-      if (problems.length) notifyError(new Error(problems.join(' · ')));
-    } catch (e) {
-      notifyError(e);
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  const groupList = groups ?? [];
   return (
     <Stack maw={760}>
       <Card withBorder>
@@ -236,12 +175,11 @@ function SettingsTab() {
           />
         </Group>
         <Box mt="sm">
-          <Destination
-            label="Número interno"
+          <TargetSelect
+            label="Destino interno"
+            w={420}
             value={s.internal_alert_jid}
             onChange={(v) => set('internal_alert_jid', v)}
-            groups={groupList}
-            connected={connected}
           />
           <Text size="xs" c="dimmed" mt={4}>
             Destino por defecto de los resúmenes, y de los préstamos que no tienen responsable (o cuyo responsable no cargó su WhatsApp).
@@ -250,14 +188,19 @@ function SettingsTab() {
       </Card>
 
       <Card withBorder>
-        <Group justify="space-between" mb="xs">
+        <Group justify="space-between" mb="xs" wrap="nowrap" align="flex-start">
           <div>
             <Title order={5}>1 · A cada responsable, lo suyo</Title>
             <Text size="sm" c="dimmed">
               Cada persona recibe en su WhatsApp los préstamos que tiene a cargo para reclamar, todos juntos en un mensaje.
             </Text>
           </div>
-          <Switch checked={s.individual_enabled} onChange={(e) => set('individual_enabled', e.currentTarget.checked)} />
+          <Group gap="sm" wrap="nowrap">
+            <Button size="xs" variant="light" color="green" leftSection={<IconBrandWhatsapp size={14} />} onClick={() => setNotify('responsibles')}>
+              Mandar ahora
+            </Button>
+            <Switch checked={s.individual_enabled} onChange={(e) => set('individual_enabled', e.currentTarget.checked)} />
+          </Group>
         </Group>
         {s.individual_enabled && (
           <>
@@ -297,14 +240,19 @@ function SettingsTab() {
       </Card>
 
       <Card withBorder>
-        <Group justify="space-between" mb="xs">
+        <Group justify="space-between" mb="xs" wrap="nowrap" align="flex-start">
           <div>
             <Title order={5}>2 · Resumen de todo lo prestado</Title>
             <Text size="sm" c="dimmed">
               Todos los préstamos activos agrupados por responsable: qué, a quién, número de serie y hace cuántos días.
             </Text>
           </div>
-          <Switch checked={s.loans_summary_enabled} onChange={(e) => set('loans_summary_enabled', e.currentTarget.checked)} />
+          <Group gap="sm" wrap="nowrap">
+            <Button size="xs" variant="light" color="green" leftSection={<IconBrandWhatsapp size={14} />} onClick={() => setNotify('loans')}>
+              Mandar ahora
+            </Button>
+            <Switch checked={s.loans_summary_enabled} onChange={(e) => set('loans_summary_enabled', e.currentTarget.checked)} />
+          </Group>
         </Group>
         {s.loans_summary_enabled && (
           <Stack gap="sm">
@@ -316,27 +264,31 @@ function SettingsTab() {
               value={String(s.loans_summary_weekday)}
               onChange={(v) => set('loans_summary_weekday', Number(v))}
             />
-            <Destination
+            <TargetSelect
               label="Mandar a"
+              placeholder="Vacío = el destino interno"
+              w={420}
               value={s.loans_summary_to}
               onChange={(v) => set('loans_summary_to', v)}
-              groups={groupList}
-              connected={connected}
-              fallback
             />
           </Stack>
         )}
       </Card>
 
       <Card withBorder>
-        <Group justify="space-between" mb="xs">
+        <Group justify="space-between" mb="xs" wrap="nowrap" align="flex-start">
           <div>
             <Title order={5}>3 · Alerta de stock mínimo</Title>
             <Text size="sm" c="dimmed">
               Lo que quedó por debajo del mínimo (consumibles y modelos como los SFP). Solo se manda si hay algo bajo el mínimo.
             </Text>
           </div>
-          <Switch checked={s.stock_alert_enabled} onChange={(e) => set('stock_alert_enabled', e.currentTarget.checked)} />
+          <Group gap="sm" wrap="nowrap">
+            <Button size="xs" variant="light" color="green" leftSection={<IconBrandWhatsapp size={14} />} onClick={() => setNotify('stock')}>
+              Mandar ahora
+            </Button>
+            <Switch checked={s.stock_alert_enabled} onChange={(e) => set('stock_alert_enabled', e.currentTarget.checked)} />
+          </Group>
         </Group>
         {s.stock_alert_enabled && (
           <Stack gap="sm">
@@ -348,24 +300,21 @@ function SettingsTab() {
               value={String(s.stock_alert_weekday)}
               onChange={(v) => set('stock_alert_weekday', Number(v))}
             />
-            <Destination
+            <TargetSelect
               label="Mandar a"
+              placeholder="Vacío = el destino interno"
+              w={420}
               value={s.stock_alert_to}
               onChange={(v) => set('stock_alert_to', v)}
-              groups={groupList}
-              connected={connected}
-              fallback
             />
           </Stack>
         )}
       </Card>
 
-      <Group justify="space-between">
-        <Button variant="default" onClick={runNow} loading={running}>
-          Correr todo ahora
-        </Button>
+      <Group justify="flex-end">
         <Button onClick={save}>Guardar configuración</Button>
       </Group>
+      <NotifyModal kind={notify} onClose={() => setNotify(null)} />
     </Stack>
   );
 }

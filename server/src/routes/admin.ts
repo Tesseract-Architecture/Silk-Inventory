@@ -114,10 +114,10 @@ export async function adminRoutes(app: FastifyInstance) {
 
     admin.put('/api/admin/settings', async (req, reply) => {
       const body = req.body as Partial<typeof defaultSettings>;
-      // Destinos: número (se normaliza) o grupo de WhatsApp (JID "...@g.us").
+      // Destinos: persona de Equipo ("user:12"), grupo de WhatsApp (JID "...@g.us") o número (se normaliza).
       for (const key of ['internal_alert_jid', 'loans_summary_to', 'stock_alert_to'] as const) {
         const v = body[key];
-        if (v && !v.includes('@')) {
+        if (v && !v.includes('@') && !/^user:\d+$/.test(v)) {
           const n = normalizePhone(v);
           if (!n) return reply.code(400).send({ error: `El número "${v}" no es válido` });
           body[key] = n;
