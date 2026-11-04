@@ -1,14 +1,49 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ActionIcon, Anchor, Badge, Button, Card, Group, Modal, NumberInput, Progress, Stack, Table, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Anchor, Autocomplete, Badge, Button, Card, Group, Modal, NumberInput, Progress, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconBrandWhatsapp, IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
 import NotifyModal from '../components/NotifyModal';
-import { api, canWrite, type ModelStock, useItems, useMe } from '../api';
+import { api, canWrite, type Item, type ModelStock, useItems, useMe } from '../api';
 import { notifyError, notifyOk } from '../util';
 
-function RuleModal({ rule, opened, onClose, onSaved }: { rule: ModelStock | null; opened: boolean; onClose: () => void; onSaved: () => void }) {
+// Igual que en el servidor: sin espacios, sin "=" y en mayúsculas.
+const normModel = (s: string) => s.trim().toUpperCase().replace(/=/g, '').replace(/\s+/g, '');
+
+interface ModelOption {
+  value: string;
+  available: number;
+  total: number;
+}
+
+/** Modelos que ya hay en el inventario (por descripción y por part number), con cuántos hay disponibles. */
+function modelOptions(items: Item[], skip: Set<string>): ModelOption[] {
+  const byKey = new Map<string, ModelOption>();
+  for (const i of items) {
+    const qty = i.kind === 'consumible' ? i.quantity : 1;
+    const names = [i.description, i.part_number].filter((x): x is string => !!x?.trim());
+    for (const key of new Set(names.map(normModel))) {
+      if (skip.has(key)) continue;
+      const o = byKey.get(key) ?? { value: names.find((n) => normModel(n) === key)!.trim().toUpperCase(), available: 0, total: 0 };
+      o.total += qty;
+      if (i.status === 'disponible') o.available += qty;
+      byKey.set(key, o);
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.value.localeCompare(b.value));
+}
+
+function RuleModal({
+  rule, opened, onClose, onSaved, items, rules,
+}: {
+  rule: ModelStock | null;
+  opened: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  items: Item[];
+  rules: ModelStock[];
+}) {
   const [v, setV] = useState({ model: '', min_qty: 10 as number, notes: '' });
   const [lastKey, setLastKey] = useState('');
   const key = `${opened}-${rule?.id}`;
@@ -16,6 +51,14 @@ function RuleModal({ rule, opened, onClose, onSaved }: { rule: ModelStock | null
     setLastKey(key);
     setV({ model: rule?.model ?? '', min_qty: rule?.min_qty ?? 10, notes: rule?.notes ?? '' });
   }
+  // Los que ya tienen mínimo no se sugieren (salvo el que se está editando).
+  const options = useMemo(
+    () => modelOptions(items, new Set(rules.filter((r) => r.id !== rule?.id).map((r) => r.model))),
+    [items, rules, rule?.id],
+  );
+  const byValue = new Map(options.map((o) => [o.value, o]));
+  const picked = options.find((o) => normModel(o.value) === normModel(v.model));
+
   const save = async () => {
     try {
       if (rule) await api(`/api/model-stock/${rule.id}`, { method: 'PUT', body: v });
@@ -30,14 +73,39 @@ function RuleModal({ rule, opened, onClose, onSaved }: { rule: ModelStock | null
   return (
     <Modal opened={opened} onClose={onClose} title={rule ? `Editar ${rule.model}` : 'Nuevo stock mínimo'}>
       <Stack>
-        <TextInput
+        <Autocomplete
           label="Modelo / part number"
-          description="Se cuentan los ítems disponibles cuya descripción o part number sea este modelo"
-          placeholder="SFP-10G-SR-S"
+          description="Elegí uno del inventario o escribí uno nuevo. Se cuentan los ítems disponibles con esa descripción o part number."
+          placeholder="Buscá: SFP-10G, GLC, room bar…"
           data-autofocus
+          data={options.map((o) => o.value)}
+          limit={40}
+          maxDropdownHeight={320}
+          renderOption={({ option }) => {
+            const o = byValue.get(option.value);
+            return (
+              <Group justify="space-between" wrap="nowrap" w="100%" gap="sm">
+                <Text size="sm" className="mono">
+                  {option.value}
+                </Text>
+                {o && (
+                  <Text size="xs" c={o.available ? 'teal' : 'dimmed'} style={{ whiteSpace: 'nowrap' }}>
+                    {o.available} disp. de {o.total}
+                  </Text>
+                )}
+              </Group>
+            );
+          }}
           value={v.model}
-          onChange={(e) => setV({ ...v, model: e.currentTarget.value.toUpperCase() })}
+          onChange={(x) => setV({ ...v, model: x.toUpperCase() })}
         />
+        {v.model.trim() && (
+          <Text size="xs" c="dimmed" mt={-8}>
+            {picked
+              ? `Hoy hay ${picked.available} disponibles (${picked.total} en total con los prestados, reservados o en uso).`
+              : 'No hay nada cargado con ese modelo todavía: va a contar desde 0.'}
+          </Text>
+        )}
         <NumberInput label="Mínimo" min={0} value={v.min_qty} onChange={(x) => setV({ ...v, min_qty: Number(x) || 0 })} />
         <TextInput label="Notas" value={v.notes} onChange={(e) => setV({ ...v, notes: e.currentTarget.value })} />
         <Group justify="flex-end">
@@ -181,7 +249,14 @@ export default function Stock() {
         </>
       )}
 
-      <RuleModal rule={edit?.rule ?? null} opened={!!edit} onClose={() => setEdit(null)} onSaved={() => refetch()} />
+      <RuleModal
+        items={items}
+        rules={rules}
+        rule={edit?.rule ?? null}
+        opened={!!edit}
+        onClose={() => setEdit(null)}
+        onSaved={() => refetch()}
+      />
       <NotifyModal kind={notifyOpen ? 'stock' : null} onClose={() => setNotifyOpen(false)} />
     </Stack>
   );
