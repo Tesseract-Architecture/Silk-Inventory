@@ -13,7 +13,7 @@ import { api, canWrite, isAdmin, type Item, type Loan, type Movement, useCategor
 import ItemFormModal from '../components/ItemFormModal';
 import LoanFormModal from '../components/LoanFormModal';
 import { ReturnModal } from './Loans';
-import { ACTION_LABELS, describeDetail, fmtDate, fmtDateTime, fmtPhone, notifyError, notifyOk, StatusBadge } from '../util';
+import { ACTION_LABELS, describeDetail, fmtDate, fmtDateTime, fmtLoanDate, fmtPhone, notifyError, notifyOk, StatusBadge } from '../util';
 
 interface ItemDetailData {
   item: Item;
@@ -170,7 +170,7 @@ export default function ItemDetail() {
 
       {activeLoan && (
         <Alert color="orange" icon={<IconHandGrab />} title={`Prestado a ${activeLoan.contact}${activeLoan.company && activeLoan.company !== activeLoan.contact ? ` (${activeLoan.company})` : ''}`}>
-          Desde el {fmtDate(activeLoan.loaned_at)}
+          {activeLoan.date_unknown ? 'Sin fecha conocida' : `Desde el ${fmtDate(activeLoan.loaned_at)}`}
           {activeLoan.due_date ? ` · devuelve el ${fmtDate(activeLoan.due_date)}` : ''}
           {(activeLoan as Loan & { responsible_name?: string | null }).responsible_name
             ? ` · responsable: ${(activeLoan as Loan & { responsible_name?: string | null }).responsible_name}`
@@ -269,7 +269,7 @@ export default function ItemDetail() {
                       {l.contact}
                       {l.company && l.company !== l.contact ? ` (${l.company})` : ''}
                     </Table.Td>
-                    <Table.Td>{fmtDate(l.loaned_at)}</Table.Td>
+                    <Table.Td>{fmtLoanDate(l.loaned_at, l.date_unknown)}</Table.Td>
                     <Table.Td>{l.returned_at ? fmtDate(l.returned_at) : <Badge color="orange">Prestado</Badge>}</Table.Td>
                     <Table.Td>{(l as any).loaned_by_name ?? '—'}</Table.Td>
                     <Table.Td>

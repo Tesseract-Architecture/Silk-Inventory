@@ -63,6 +63,7 @@ export interface ItemRow {
   loan_contact: string | null;
   loan_company: string | null;
   loaned_at: string | null;
+  loan_date_unknown: number | null;
   loan_due: string | null;
   loaned_qty: number | null;
 }
@@ -74,7 +75,7 @@ export function listItems(where = '1=1', params: unknown[] = []): ItemRow[] {
               i.serial_number, i.location_id, i.status, i.kind, i.quantity, i.unit, i.min_stock,
               i.box_mismatch, i.notes, i.updated_at, i.assigned_to, au.name AS assigned_name,
               l.id AS loan_id, ct.name AS loan_contact, ct.company AS loan_company,
-              l.loaned_at, l.due_date AS loan_due,
+              l.loaned_at, l.date_unknown AS loan_date_unknown, l.due_date AS loan_due,
               (SELECT SUM(quantity) FROM loans WHERE item_id = i.id AND returned_at IS NULL) AS loaned_qty
          FROM items i
          LEFT JOIN categories c ON c.id = i.category_id
@@ -263,7 +264,7 @@ export async function itemRoutes(app: FastifyInstance) {
       ws.addRow({
         ...i,
         loan: i.loan_contact ? [i.loan_contact, i.loan_company].filter(Boolean).join(' - ') : '',
-        loaned_at: formatDateAr(i.loaned_at),
+        loaned_at: i.loan_date_unknown ? 'sin fecha' : formatDateAr(i.loaned_at),
       });
     }
     ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };

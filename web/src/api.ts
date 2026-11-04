@@ -55,6 +55,7 @@ export interface Item {
   loan_contact: string | null;
   loan_company: string | null;
   loaned_at: string | null;
+  loan_date_unknown: number | null;
   loan_due: string | null;
   loaned_qty: number | null;
 }
@@ -90,6 +91,8 @@ export interface Loan {
   contact_id: number;
   quantity: number;
   loaned_at: string;
+  /** No se sabe cuándo se prestó: `loaned_at` es el día en que se cargó. */
+  date_unknown: number;
   due_date: string | null;
   returned_at: string | null;
   notes: string | null;

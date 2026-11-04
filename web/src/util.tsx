@@ -69,6 +69,11 @@ export function fmtDate(iso?: string | null): string {
 }
 
 /** Fecha-hora guardada en UTC por SQLite -> hora local. */
+/** Fecha de un préstamo; los cargados sin fecha conocida dicen "Sin fecha". */
+export function fmtLoanDate(iso: string | null | undefined, unknown?: number | boolean | null): string {
+  return unknown ? 'Sin fecha' : fmtDate(iso);
+}
+
 export function fmtDateTime(sqlUtc?: string | null): string {
   if (!sqlUtc) return '';
   const d = new Date(sqlUtc.replace(' ', 'T') + (sqlUtc.includes('Z') ? '' : 'Z'));

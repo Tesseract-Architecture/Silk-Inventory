@@ -64,11 +64,14 @@ export function renderReminder(
     item: string;
     serie: string | null;
     loaned_at: string;
+    /** Sin fecha conocida: `loaned_at` es cuándo se cargó, así que los días son "por lo menos". */
+    date_unknown?: boolean;
     due_date: string | null;
     today: string;
   },
 ): string {
   const dias = daysBetween(v.loaned_at, v.today);
+  if (v.date_unknown) template = template.replace('desde el {fecha}', 'desde {fecha}');
   const vence = v.due_date
     ? v.today > v.due_date
       ? ` La devolución estaba prevista para el ${formatDateAr(v.due_date)}.`
@@ -80,8 +83,8 @@ export function renderReminder(
     quien: v.quien,
     item: v.item,
     serie: v.serie ? ` (S/N ${v.serie})` : '',
-    fecha: formatDateAr(v.loaned_at),
-    dias: String(dias),
+    fecha: v.date_unknown ? 'una fecha que no tenemos' : formatDateAr(v.loaned_at),
+    dias: v.date_unknown ? `más de ${dias}` : String(dias),
     vence,
   };
   return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k] : m));

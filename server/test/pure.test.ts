@@ -61,6 +61,13 @@ describe('renderReminder', () => {
         ' La devolución estaba prevista para el 05/07/2026. ¿Lo reclamamos?',
     );
   });
+  it('sin fecha conocida no inventa la fecha', () => {
+    const msg = renderReminder('{item} está prestado a {quien} desde el {fecha} ({dias} días).', {
+      nombre: 'Maxi', quien: 'OCP', item: 'cisco nexus', serie: null,
+      loaned_at: '2026-11-04', date_unknown: true, due_date: null, today: '2026-11-11',
+    });
+    expect(msg).toBe('cisco nexus está prestado a OCP desde una fecha que no tenemos (más de 7 días).');
+  });
 });
 
 describe('import parse', () => {

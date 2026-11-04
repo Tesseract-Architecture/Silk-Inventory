@@ -17,6 +17,8 @@ const createSchema = z.object({
     .nullish(),
   quantity: z.number().positive().nullish(),
   loaned_at: dateStr,
+  /** No se sabe cuándo se prestó: `loaned_at` es el día en que se cargó. */
+  date_unknown: z.boolean().default(false),
   due_date: dateStr.nullish(),
   notes: z.string().trim().nullish(),
   reminder_every_days: z.number().int().positive().nullish(),
@@ -26,6 +28,7 @@ const createSchema = z.object({
 
 const updateSchema = z.object({
   loaned_at: dateStr,
+  date_unknown: z.boolean().default(false),
   due_date: dateStr.nullish(),
   notes: z.string().trim().nullish(),
   reminders_paused: z.boolean(),
@@ -109,11 +112,11 @@ export async function loanRoutes(app: FastifyInstance) {
           const loanId = Number(
             db
               .prepare(
-                `INSERT INTO loans (item_id, contact_id, quantity, loaned_at, due_date, notes, reminder_every_days, loaned_by, responsible_id)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO loans (item_id, contact_id, quantity, loaned_at, date_unknown, due_date, notes, reminder_every_days, loaned_by, responsible_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               )
               .run(
-                itemId, contactId, qty, v.loaned_at, v.due_date ?? null, v.notes || null, v.reminder_every_days ?? null, uid,
+                itemId, contactId, qty, v.loaned_at, v.date_unknown ? 1 : 0, v.due_date ?? null, v.notes || null, v.reminder_every_days ?? null, uid,
                 v.responsible_id === undefined ? uid : v.responsible_id,
               )
               .lastInsertRowid,
@@ -141,8 +144,8 @@ export async function loanRoutes(app: FastifyInstance) {
     if (!p.success) return reply.code(400).send({ error: p.error.issues[0].message });
     const v = p.data;
     db.prepare(
-      'UPDATE loans SET loaned_at = ?, due_date = ?, notes = ?, reminders_paused = ?, reminder_every_days = ?, responsible_id = ? WHERE id = ?',
-    ).run(v.loaned_at, v.due_date ?? null, v.notes || null, v.reminders_paused ? 1 : 0, v.reminder_every_days ?? null, v.responsible_id ?? null, id);
+      'UPDATE loans SET loaned_at = ?, date_unknown = ?, due_date = ?, notes = ?, reminders_paused = ?, reminder_every_days = ?, responsible_id = ? WHERE id = ?',
+    ).run(v.loaned_at, v.date_unknown ? 1 : 0, v.due_date ?? null, v.notes || null, v.reminders_paused ? 1 : 0, v.reminder_every_days ?? null, v.responsible_id ?? null, id);
     return loanList('l.id = ?', [id])[0];
   });
 

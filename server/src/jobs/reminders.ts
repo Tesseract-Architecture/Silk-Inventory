@@ -8,6 +8,7 @@ export interface ActiveLoan {
   item_id: number;
   quantity: number;
   loaned_at: string;
+  date_unknown: number;
   due_date: string | null;
   returned_at: string | null;
   reminders_paused: number;
@@ -42,7 +43,7 @@ export function activeLoans(): ActiveLoan[] {
   const fallback = resolveTarget(getSettings().internal_alert_jid);
   const rows = db
     .prepare(
-      `SELECT l.id, l.item_id, l.quantity, l.loaned_at, l.due_date, l.returned_at, l.reminders_paused,
+      `SELECT l.id, l.item_id, l.quantity, l.loaned_at, l.date_unknown, l.due_date, l.returned_at, l.reminders_paused,
               l.reminder_every_days, l.last_reminder_at, l.reminder_count,
               c.id AS contact_id, c.name AS contact_name, c.company AS contact_company, c.phone AS contact_phone,
               u.id AS responsible_id, u.name AS responsible_name, u.phone AS responsible_phone,
@@ -88,6 +89,7 @@ export function reminderMessage(loan: ActiveLoan, today = todayLocal()): string 
     item: qty + loan.item_description,
     serie: loan.serial_number,
     loaned_at: loan.loaned_at,
+    date_unknown: !!loan.date_unknown,
     due_date: loan.due_date,
     today,
   });
@@ -184,7 +186,9 @@ function loanLine(l: ActiveLoan, today: string, firstAfter: number): string {
   const sn = l.serial_number ? ` (S/N ${l.serial_number})` : '';
   const due = l.due_date ? ` · devolvía ${formatDateAr(l.due_date)}` : '';
   const flag = isLate(l, today, firstAfter) ? ' ⚠️' : '';
-  return `• ${qty}${l.item_description}${sn} → ${borrowerLabel(l)} · desde ${formatDateAr(l.loaned_at)} (${daysBetween(l.loaned_at, today)} días)${due}${flag}`;
+  const days = daysBetween(l.loaned_at, today);
+  const since = l.date_unknown ? `sin fecha (cargado hace ${days} días)` : `desde ${formatDateAr(l.loaned_at)} (${days} días)`;
+  return `• ${qty}${l.item_description}${sn} → ${borrowerLabel(l)} · ${since}${due}${flag}`;
 }
 
 /** Lo que le llega a un responsable: un préstamo usa la plantilla; varios, una lista. */

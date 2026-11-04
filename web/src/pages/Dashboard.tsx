@@ -3,13 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Anchor, Badge, Card, Group, Loader, Progress, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { IconAlertTriangle, IconBox, IconBoxOff, IconBrandWhatsapp, IconClockExclamation, IconHandGrab, IconTool } from '@tabler/icons-react';
 import { api, type Movement } from '../api';
-import { ACTION_LABELS, describeDetail, fmtDate, fmtDateTime } from '../util';
+import { ACTION_LABELS, describeDetail, fmtDate, fmtDateTime, fmtLoanDate } from '../util';
 
 interface DashboardData {
   totals: { items: number; loaned: number; overdue: number; lowStock: number; broken: number; boxMismatch: number };
   byLocation: { name: string; n: number }[];
   byCategory: { name: string; n: number }[];
-  loans: { id: number; item_id: number; item_description: string; serial_number: string | null; contact_name: string; contact_company: string | null; loaned_at: string; days: number; overdue: boolean }[];
+  loans: { id: number; item_id: number; item_description: string; serial_number: string | null; contact_name: string; contact_company: string | null; loaned_at: string; date_unknown: number; days: number; overdue: boolean }[];
   lowStock: { kind: 'item' | 'modelo'; id: number; code: string | null; description: string; quantity: number; min_stock: number; unit: string | null }[];
   recent: Movement[];
   whatsapp: string;
@@ -91,7 +91,7 @@ export default function Dashboard() {
                         {l.days} días
                       </Badge>
                       <Text size="xs" c="dimmed">
-                        {fmtDate(l.loaned_at)}
+                        {fmtLoanDate(l.loaned_at, l.date_unknown)}
                       </Text>
                     </Table.Td>
                   </Table.Tr>

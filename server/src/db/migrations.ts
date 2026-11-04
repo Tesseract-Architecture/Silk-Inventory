@@ -155,4 +155,8 @@ export const migrations: string[] = [
   DELETE FROM contacts WHERE id NOT IN (SELECT MIN(id) FROM contacts GROUP BY lower(trim(name)));
   CREATE UNIQUE INDEX contacts_name_unique ON contacts(lower(trim(name)));
   `,
+
+  /* 5: préstamos viejos de los que no se sabe la fecha: loaned_at queda como el día en que se cargaron */ `
+  ALTER TABLE loans ADD COLUMN date_unknown INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

@@ -11,7 +11,7 @@ import {
 import { api, canWrite, type Loan, useLoans, useMe, useRefresh, useUsers } from '../api';
 import LoanFormModal from '../components/LoanFormModal';
 import NotifyModal, { type NotifyKind } from '../components/NotifyModal';
-import { fmtDate, fmtPhone, norm, notifyError, notifyOk, todayIso, waLink } from '../util';
+import { fmtDate, fmtLoanDate, fmtPhone, norm, notifyError, notifyOk, todayIso, waLink } from '../util';
 
 export function ReturnModal({ loan, onClose }: { loan: Loan | null; onClose: () => void }) {
   const refresh = useRefresh();
@@ -130,6 +130,7 @@ function EditLoanModal({ loan, onClose }: { loan: Loan | null; onClose: () => vo
   const { data: users = [] } = useUsers();
   const [v, setV] = useState({
     loaned_at: '',
+    date_unknown: false,
     due_date: null as string | null,
     notes: '',
     reminders_paused: false,
@@ -140,6 +141,7 @@ function EditLoanModal({ loan, onClose }: { loan: Loan | null; onClose: () => vo
     if (loan)
       setV({
         loaned_at: loan.loaned_at,
+        date_unknown: !!loan.date_unknown,
         due_date: loan.due_date,
         notes: loan.notes ?? '',
         reminders_paused: !!loan.reminders_paused,
@@ -169,7 +171,21 @@ function EditLoanModal({ loan, onClose }: { loan: Loan | null; onClose: () => vo
   return (
     <Modal opened={!!loan} onClose={onClose} title="Editar préstamo">
       <Stack>
-        <DateInput label="Fecha de préstamo" value={v.loaned_at} onChange={(x) => setV({ ...v, loaned_at: x ?? v.loaned_at })} />
+        <Stack gap={6}>
+          <DateInput
+            label="Fecha de préstamo"
+            value={v.date_unknown ? null : v.loaned_at}
+            placeholder={v.date_unknown ? 'Sin fecha' : undefined}
+            disabled={v.date_unknown}
+            onChange={(x) => setV({ ...v, loaned_at: x ?? v.loaned_at })}
+          />
+          <Checkbox
+            size="xs"
+            label="No sé la fecha"
+            checked={v.date_unknown}
+            onChange={(e) => setV({ ...v, date_unknown: e.currentTarget.checked })}
+          />
+        </Stack>
         <DateInput label="Devolución prevista" clearable value={v.due_date} onChange={(x) => setV({ ...v, due_date: x })} />
         <Select
           label="¿Quién de Silk lo prestó?"
@@ -313,11 +329,13 @@ export default function Loans() {
                     )}
                   </Table.Td>
                   <Table.Td>
-                    <Text size="sm">{fmtDate(l.loaned_at)}</Text>
+                    <Text size="sm">{fmtLoanDate(l.loaned_at, l.date_unknown)}</Text>
                     {!l.returned_at && (
-                      <Badge size="sm" variant="light" color={l.overdue ? 'red' : l.days >= 7 ? 'orange' : 'gray'}>
-                        {l.days} días
-                      </Badge>
+                      <Tooltip label={`Cargado el ${fmtDate(l.loaned_at)}`} disabled={!l.date_unknown}>
+                        <Badge size="sm" variant="light" color={l.overdue ? 'red' : l.days >= 7 ? 'orange' : 'gray'}>
+                          {l.date_unknown ? `+${l.days}` : l.days} días
+                        </Badge>
+                      </Tooltip>
                     )}
                     {l.loaned_by_name && (
                       <Text size="xs" c="dimmed">

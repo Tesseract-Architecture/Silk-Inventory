@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Button, Group, Modal, MultiSelect, NumberInput, SegmentedControl, Select, SimpleGrid, Stack, Text, Textarea, TextInput,
+  Alert, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, SegmentedControl, Select, SimpleGrid, Stack, Text, Textarea, TextInput,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { api, type Loan, useContacts, useItems, useMe, useRefresh, useUsers } from '../api';
@@ -24,6 +24,7 @@ export default function LoanFormModal({ opened, onClose, itemIds }: Props) {
   const [contactId, setContactId] = useState<string | null>(null);
   const [nc, setNc] = useState({ name: '', company: '', phone: '' });
   const [loanedAt, setLoanedAt] = useState<string | null>(todayIso());
+  const [dateUnknown, setDateUnknown] = useState(false);
   const [due, setDue] = useState<string | null>(null);
   const [qty, setQty] = useState<number>(1);
   const [every, setEvery] = useState<number | ''>('');
@@ -68,7 +69,8 @@ export default function LoanFormModal({ opened, onClose, itemIds }: Props) {
           item_ids: selected.map(Number),
           contact_id: mode === 'existente' && contactId ? Number(contactId) : null,
           new_contact: mode === 'nuevo' ? nc : null,
-          loaned_at: loanedAt,
+          loaned_at: dateUnknown ? todayIso() : loanedAt,
+          date_unknown: dateUnknown,
           due_date: due || null,
           quantity: consumable ? qty : null,
           notes,
@@ -163,7 +165,17 @@ export default function LoanFormModal({ opened, onClose, itemIds }: Props) {
         )}
 
         <SimpleGrid cols={{ base: 1, sm: 3 }} mt="xs">
-          <DateInput label="Fecha de préstamo" value={loanedAt} onChange={setLoanedAt} required />
+          <Stack gap={6}>
+            <DateInput
+              label="Fecha de préstamo"
+              value={dateUnknown ? null : loanedAt}
+              placeholder={dateUnknown ? 'Sin fecha' : undefined}
+              onChange={setLoanedAt}
+              disabled={dateUnknown}
+              required={!dateUnknown}
+            />
+            <Checkbox size="xs" label="No sé la fecha" checked={dateUnknown} onChange={(e) => setDateUnknown(e.currentTarget.checked)} />
+          </Stack>
           <DateInput label="Devolución prevista" placeholder="Opcional" value={due} onChange={setDue} clearable minDate={loanedAt ?? undefined} />
           <NumberInput
             label="Recordar cada (días)"
@@ -184,7 +196,7 @@ export default function LoanFormModal({ opened, onClose, itemIds }: Props) {
           <Button
             onClick={save}
             loading={saving}
-            disabled={!selected.length || !loanedAt || (mode === 'existente' ? !contactId : !nc.name.trim())}
+            disabled={!selected.length || (!loanedAt && !dateUnknown) || (mode === 'existente' ? !contactId : !nc.name.trim())}
           >
             Registrar préstamo
           </Button>

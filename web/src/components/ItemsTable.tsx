@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge, Checkbox, Group, Pagination, Table, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconAlertTriangle, IconBoxOff, IconChevronDown, IconChevronUp, IconSelector } from '@tabler/icons-react';
 import type { Item } from '../api';
-import { fmtDate, StatusBadge } from '../util';
+import { fmtLoanDate, StatusBadge } from '../util';
 
 type SortKey = 'code' | 'description' | 'category' | 'location' | 'serial_number' | 'status' | 'quantity';
 
@@ -139,7 +139,7 @@ export default function ItemsTable({ items, selected, onSelectedChange, hideLoca
                   {i.loan_contact && (
                     <Text size="xs" c="dimmed">
                       {i.loan_company && i.loan_company !== i.loan_contact ? `${i.loan_contact} (${i.loan_company})` : i.loan_contact}
-                      {i.loaned_at ? ` · ${fmtDate(i.loaned_at)}` : ''}
+                      {i.loaned_at ? ` · ${fmtLoanDate(i.loaned_at, i.loan_date_unknown)}` : ''}
                     </Text>
                   )}
                 </Table.Td>
