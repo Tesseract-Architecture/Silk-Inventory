@@ -187,9 +187,16 @@ export async function catalogRoutes(app: FastifyInstance) {
     return { data: { ...p.data, phone, company: p.data.company || null, email: p.data.email || null, notes: p.data.notes || null } };
   };
 
+  const sameName = (name: string, exceptId = 0) =>
+    db.prepare('SELECT name FROM contacts WHERE lower(trim(name)) = lower(trim(?)) AND id != ?').get(name, exceptId) as
+      | { name: string }
+      | undefined;
+
   app.post('/api/contacts', { preHandler: requireWrite }, async (req, reply) => {
     const r = saveContact(req.body);
     if ('error' in r) return reply.code(400).send({ error: r.error });
+    const dup = sameName(r.data.name);
+    if (dup) return reply.code(409).send({ error: `Ya existe la empresa "${dup.name}"` });
     const id = db
       .prepare('INSERT INTO contacts (name, company, phone, email, notes) VALUES (@name, @company, @phone, @email, @notes)')
       .run(r.data).lastInsertRowid;
@@ -200,6 +207,8 @@ export async function catalogRoutes(app: FastifyInstance) {
     const id = Number((req.params as { id: string }).id);
     const r = saveContact(req.body);
     if ('error' in r) return reply.code(400).send({ error: r.error });
+    const dup = sameName(r.data.name, id);
+    if (dup) return reply.code(409).send({ error: `Ya existe la empresa "${dup.name}"` });
     db.prepare('UPDATE contacts SET name = @name, company = @company, phone = @phone, email = @email, notes = @notes WHERE id = @id').run({
       ...r.data,
       id,

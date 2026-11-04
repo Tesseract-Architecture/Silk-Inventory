@@ -11,7 +11,8 @@ import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { api, ApiError, canWrite, type Item, type ModelStock, useCategories, useItems, useLocations, useMe, useRefresh } from '../api';
 import { locationOptions, norm, notifyError, notifyOk, STATUS } from '../util';
 
-const SFP_CATEGORY = 'SFP / Ópticos';
+// La categoría de los SFP se reconoce por el nombre ("SFP y transceivers", "SFP / Ópticos"…), así un renombre no la rompe.
+const isSfpCategory = (name: string) => /^sfp/i.test(name.trim());
 
 interface Column {
   model: string;
@@ -122,7 +123,7 @@ export default function Sfps() {
   const [add, setAdd] = useState<{ model: string; locationId: number | null } | null>(null);
   const write = canWrite(me?.user);
 
-  const category = categories.find((c) => c.name === SFP_CATEGORY);
+  const category = categories.find((c) => isSfpCategory(c.name));
   const ruleByModel = new Map(rules.map((r) => [r.model, r]));
   // Modelos para autocompletar: los que ya hay en las cajas + los de la lista de stock mínimo.
   const knownModels = useMemo(() => {
@@ -190,7 +191,7 @@ export default function Sfps() {
         </Group>
       </Group>
 
-      {groups.length === 0 && <Text c="dimmed">No hay ítems con la categoría “{SFP_CATEGORY}”.</Text>}
+      {groups.length === 0 && <Text c="dimmed">No hay ítems en una categoría que empiece con “SFP”.</Text>}
 
       {groups.map((g) => {
         const cols = g.columns.filter((c) => !t || norm(c.model).includes(t) || [...c.units, ...c.loose].some(matches));

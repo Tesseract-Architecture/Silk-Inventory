@@ -75,6 +75,10 @@ export async function loanRoutes(app: FastifyInstance) {
       const ids = db.transaction(() => {
         let contactId = v.contact_id ?? null;
         if (!contactId && v.new_contact) {
+          const dup = db
+            .prepare('SELECT name FROM contacts WHERE lower(trim(name)) = lower(trim(?))')
+            .get(v.new_contact.name) as { name: string } | undefined;
+          if (dup) throw new Error(`Ya existe la empresa "${dup.name}": elegila en "Empresa existente"`);
           const phone = v.new_contact.phone ? normalizePhone(v.new_contact.phone) : null;
           if (v.new_contact.phone && !phone) throw new Error('El teléfono no parece válido (ej: 11 1234-5678)');
           contactId = Number(

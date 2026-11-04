@@ -146,4 +146,13 @@ export const migrations: string[] = [
   /* 3: "en uso" por alguien de Silk (se lo llevó a un trabajo, lo tiene en su oficina): no es un préstamo */ `
   ALTER TABLE items ADD COLUMN assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL;
   `,
+
+  /* 4: empresas sin nombres repetidos. Une las que ya estén duplicadas (los préstamos pasan a la más vieja). */ `
+  UPDATE loans SET contact_id = (
+    SELECT MIN(c2.id) FROM contacts c2
+     WHERE lower(trim(c2.name)) = (SELECT lower(trim(c.name)) FROM contacts c WHERE c.id = loans.contact_id)
+  );
+  DELETE FROM contacts WHERE id NOT IN (SELECT MIN(id) FROM contacts GROUP BY lower(trim(name)));
+  CREATE UNIQUE INDEX contacts_name_unique ON contacts(lower(trim(name)));
+  `,
 ];
