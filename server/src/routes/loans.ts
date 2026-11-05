@@ -5,7 +5,7 @@ import { db, getSettings, logMovement } from '../db/db.js';
 import { todayLocal } from '../lib/dates.js';
 import { normalizePhone } from '../lib/phone.js';
 import { daysBetween, isOverdue, shouldRemind } from '../lib/reminders.js';
-import { activeLoans, reminderMessage, sendLoanReminder } from '../jobs/reminders.js';
+import { activeLoans, reminderMessage, resolveTarget, sendLoanReminder } from '../jobs/reminders.js';
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida');
 
@@ -51,7 +51,8 @@ function loanList(where: string, params: unknown[] = []) {
         WHERE ${where} ORDER BY l.returned_at IS NOT NULL, l.loaned_at DESC, l.id DESC`,
     )
     .all(...params) as Record<string, any>[];
-  for (const l of rows) l.remind_to = l.responsible_phone || s.internal_alert_jid || null;
+  const fallback = resolveTarget(s.internal_alert_jid);
+  for (const l of rows) l.remind_to = l.responsible_phone || fallback;
   return rows.map((l) => ({
     ...l,
     days: daysBetween(l.loaned_at, l.returned_at?.slice(0, 10) ?? today),
