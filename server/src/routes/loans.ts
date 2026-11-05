@@ -4,8 +4,8 @@ import { requireWrite } from '../auth/auth.js';
 import { db, getSettings, logMovement } from '../db/db.js';
 import { todayLocal } from '../lib/dates.js';
 import { normalizePhone } from '../lib/phone.js';
-import { daysBetween, isOverdue, shouldRemind } from '../lib/reminders.js';
-import { activeLoans, reminderMessage, resolveTarget, sendLoanReminder } from '../jobs/reminders.js';
+import { daysBetween, isOverdue } from '../lib/reminders.js';
+import { activeLoans, reminderMessage, remindsToday, resolveTarget, sendLoanReminder } from '../jobs/reminders.js';
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida');
 
@@ -57,7 +57,7 @@ function loanList(where: string, params: unknown[] = []) {
     ...l,
     days: daysBetween(l.loaned_at, l.returned_at?.slice(0, 10) ?? today),
     overdue: isOverdue(l as any, today),
-    remind_today: shouldRemind(l as any, s, today),
+    remind_today: remindsToday(l as any, s, today),
   }));
 }
 

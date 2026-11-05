@@ -32,8 +32,10 @@ export function isOverdue(loan: Pick<ReminderLoan, 'due_date' | 'returned_at'>, 
  * - Con fecha de devolución: se avisa a partir del día siguiente al vencimiento.
  * - Sin fecha: se avisa cuando lleva >= N días prestado.
  * - Después se repite cada X días (del préstamo o de la configuración general).
+ * - `weekly`: los avisos salen un día fijo por semana; ese día va todo lo que ya pasó el primer aviso
+ *   (sin "repetir cada"), salvo que ya se haya avisado hoy.
  */
-export function shouldRemind(loan: ReminderLoan, s: ReminderSettings, today: string): boolean {
+export function shouldRemind(loan: ReminderLoan, s: ReminderSettings, today: string, weekly = false): boolean {
   if (loan.returned_at || loan.reminders_paused || !loan.remind_to) return false;
 
   const triggered = loan.due_date
@@ -42,6 +44,7 @@ export function shouldRemind(loan: ReminderLoan, s: ReminderSettings, today: str
   if (!triggered) return false;
 
   if (!loan.last_reminder_at) return true;
+  if (weekly) return loan.last_reminder_at.slice(0, 10) !== today;
   const every = Math.max(1, loan.reminder_every_days ?? s.reminder_every_days);
   return daysBetween(loan.last_reminder_at.slice(0, 10), today) >= every;
 }

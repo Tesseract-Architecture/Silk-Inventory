@@ -122,7 +122,9 @@ interface Settings {
   reminder_weekdays_only: boolean;
   reminder_template: string;
   internal_alert_jid: string;
+  internal_weekday: number;
   individual_enabled: boolean;
+  individual_weekday: number;
   loans_summary_enabled: boolean;
   loans_summary_to: string;
   loans_summary_weekday: number;
@@ -151,6 +153,8 @@ function SettingsTab() {
   }, [data]);
   if (!s || !data) return <Loader />;
 
+  // Con "solo de lunes a viernes" no sale nada el fin de semana: no se puede elegir sábado ni domingo.
+  const weekdays = WEEKDAY_OPTIONS.map((o) => ({ ...o, disabled: s.reminder_weekdays_only && (o.value === '6' || o.value === '7') }));
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...s, [k]: v });
   const save = () =>
     api<{ settings: Settings }>('/api/admin/settings', { method: 'PUT', body: s }).then((r) => {
@@ -174,17 +178,26 @@ function SettingsTab() {
             onChange={(e) => set('reminder_weekdays_only', e.currentTarget.checked)}
           />
         </Group>
-        <Box mt="sm">
+        <Group mt="sm" align="flex-end">
           <TargetSelect
             label="Destino interno"
             w={420}
             value={s.internal_alert_jid}
             onChange={(v) => set('internal_alert_jid', v)}
           />
-          <Text size="xs" c="dimmed" mt={4}>
-            Destino por defecto de los resúmenes, y de los préstamos que no tienen responsable (o cuyo responsable no cargó su WhatsApp).
-          </Text>
-        </Box>
+          <Select
+            label="Préstamos sin responsable"
+            w={220}
+            allowDeselect={false}
+            data={weekdays}
+            value={String(s.internal_weekday)}
+            onChange={(v) => set('internal_weekday', Number(v))}
+          />
+        </Group>
+        <Text size="xs" c="dimmed" mt={4}>
+          Destino por defecto de los resúmenes, y de los préstamos que no tienen responsable (o cuyo responsable no cargó su WhatsApp).
+          Esos préstamos se avisan el día elegido.
+        </Text>
       </Card>
 
       <Card withBorder>
@@ -205,6 +218,14 @@ function SettingsTab() {
         {s.individual_enabled && (
           <>
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
+              <Select
+                label="Frecuencia"
+                allowDeselect={false}
+                data={weekdays}
+                value={String(s.individual_weekday)}
+                onChange={(v) => set('individual_weekday', Number(v))}
+              />
+              <div />
               <NumberInput
                 label="Primer aviso a los (días)"
                 description="Si el préstamo no tiene fecha de devolución"
@@ -212,14 +233,22 @@ function SettingsTab() {
                 value={s.reminder_first_after_days}
                 onChange={(v) => set('reminder_first_after_days', Number(v) || 1)}
               />
-              <NumberInput
-                label="Repetir cada (días)"
-                description="Hasta que se devuelva"
-                min={1}
-                value={s.reminder_every_days}
-                onChange={(v) => set('reminder_every_days', Number(v) || 1)}
-              />
+              {s.individual_weekday === 0 && (
+                <NumberInput
+                  label="Repetir cada (días)"
+                  description="Hasta que se devuelva"
+                  min={1}
+                  value={s.reminder_every_days}
+                  onChange={(v) => set('reminder_every_days', Number(v) || 1)}
+                />
+              )}
             </SimpleGrid>
+            {s.individual_weekday !== 0 && (
+              <Text size="xs" c="dimmed" mt={4}>
+                {WEEKDAY_OPTIONS.find((o) => o.value === String(s.individual_weekday))?.label}, a cada responsable le llegan todos sus
+                préstamos que ya pasaron el primer aviso (o su fecha de devolución), hasta que se devuelvan.
+              </Text>
+            )}
             <Textarea
               mt="sm"
               label="Mensaje (cuando es un solo préstamo)"
@@ -260,7 +289,7 @@ function SettingsTab() {
               label="Frecuencia"
               w={220}
               allowDeselect={false}
-              data={WEEKDAY_OPTIONS}
+              data={weekdays}
               value={String(s.loans_summary_weekday)}
               onChange={(v) => set('loans_summary_weekday', Number(v))}
             />
@@ -296,7 +325,7 @@ function SettingsTab() {
               label="Frecuencia"
               w={220}
               allowDeselect={false}
-              data={WEEKDAY_OPTIONS}
+              data={weekdays}
               value={String(s.stock_alert_weekday)}
               onChange={(v) => set('stock_alert_weekday', Number(v))}
             />

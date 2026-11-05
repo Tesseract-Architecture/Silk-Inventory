@@ -59,8 +59,11 @@ export const defaultSettings = {
     'Hola {nombre}! Recordatorio: {item}{serie} está prestado a {quien} desde el {fecha} ({dias} días).{vence} ¿Lo reclamamos?',
   // Número o grupo interno: destino por defecto de los resúmenes y de los préstamos sin responsable.
   internal_alert_jid: '',
-  // 1) A cada responsable, sus préstamos para reclamar.
+  // Préstamos sin responsable (o sin WhatsApp) → destino interno: qué día. 0 = todos los días, 1..7 = lunes..domingo.
+  internal_weekday: 1,
+  // 1) A cada responsable, sus préstamos para reclamar. weekday: 0 = todos los días (usa "repetir cada"), 1..7 = ese día.
   individual_enabled: true,
+  individual_weekday: 1,
   // 2) Resumen de todo lo prestado. weekday: 0 = todos los días, 1..7 = lunes..domingo. to vacío = interno.
   loans_summary_enabled: true,
   loans_summary_to: '',

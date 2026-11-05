@@ -1,4 +1,4 @@
-import { db, getSettings } from '../db/db.js';
+import { db, getSettings, type Settings } from '../db/db.js';
 import { localParts, todayLocal } from '../lib/dates.js';
 import { daysBetween, formatDateAr, isOverdue, renderReminder, shouldRemind } from '../lib/reminders.js';
 import { sendText, waState } from '../whatsapp/client.js';
@@ -177,6 +177,20 @@ function dayMatches(weekday: number): boolean {
   return !weekday || localParts().weekday === WEEKDAYS[weekday - 1];
 }
 
+/**
+ * ¿Le toca aviso hoy a este préstamo? Los que tienen responsable con WhatsApp siguen la frecuencia de
+ * "a cada responsable"; los que van al destino interno, la suya. `anyDay` ignora el día de la semana.
+ */
+export function remindsToday(
+  l: Parameters<typeof shouldRemind>[0] & { responsible_phone: string | null },
+  s: Settings,
+  today = todayLocal(),
+  anyDay = false,
+): boolean {
+  const weekday = l.responsible_phone ? s.individual_weekday : s.internal_weekday;
+  return (anyDay || dayMatches(weekday)) && shouldRemind(l, s, today, weekday !== 0);
+}
+
 function isLate(l: ActiveLoan, today: string, firstAfter: number) {
   return isOverdue(l, today) || (!l.due_date && daysBetween(l.loaned_at, today) >= firstAfter);
 }
@@ -324,7 +338,7 @@ export async function runDailyReminders(opts: { force?: boolean } = {}) {
   }
 
   if (s.individual_enabled) {
-    const due = activeLoans().filter((l) => shouldRemind(l, s, today));
+    const due = activeLoans().filter((l) => remindsToday(l, s, today, opts.force));
     const r = await sendToResponsibles(due);
     Object.assign(result, { sent: r.sent, errors: r.errors, skipped: r.skipped });
     result.notes.push(...r.errorMessages);

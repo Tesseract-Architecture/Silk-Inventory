@@ -33,6 +33,12 @@ describe('shouldRemind', () => {
     expect(shouldRemind(l, s, '2026-11-14')).toBe(false);
     expect(shouldRemind(l, s, '2026-11-15')).toBe(true);
   });
+  it('semanal: el día elegido va todo lo que ya pasó el primer aviso, una vez por día', () => {
+    expect(shouldRemind(base, s, '2026-11-07', true)).toBe(false);
+    const l = { ...base, last_reminder_at: '2026-11-12' }; // aviso manual un jueves
+    expect(shouldRemind(l, s, '2026-11-16', true)).toBe(true); // el lunes siguiente igual sale
+    expect(shouldRemind({ ...l, last_reminder_at: '2026-11-16 13:00:00' }, s, '2026-11-16', true)).toBe(false);
+  });
   it('con fecha de devolución espera al vencimiento', () => {
     const l = { ...base, due_date: '2026-11-30' };
     expect(shouldRemind(l, s, '2026-11-20')).toBe(false);
